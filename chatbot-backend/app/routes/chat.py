@@ -13,11 +13,7 @@ async def chat(
     # 1. Try to match and return exact PYQ on demand
     pyq_result = await get_pyq_response(req.message)
     if pyq_result is not None:
-        text, file_url = pyq_result
-        return ChatResponse(
-            response=text,
-            file_url=file_url
-        )
+        return ChatResponse(response=pyq_result)
         
     # 2. Otherwise fall back to General LLM Conversation
     ai_reply = await llm.generate_response(req.message)

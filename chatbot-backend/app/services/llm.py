@@ -1,4 +1,5 @@
 import logging
+import re
 from google import genai
 from google.genai import types
 from app.config import settings
@@ -21,10 +22,33 @@ class LLMService:
             logger.warning("Gemini API key is not configured. Running in unconfigured mode.")
 
     async def generate_response(self, message: str) -> str:
+        text = message.lower().strip()
+        academic_patterns = [
+            r"\bpyqs?\b",
+            r"\bprevious\s+year\s+questions?\b",
+            r"\bprevious\s+year\s+papers?\b",
+            r"\bquestion\s+papers?\b",
+            r"\bexam\s+papers?\b",
+            r"\bpast\s+papers?\b",
+            r"\bquestion\s+banks?\b",
+            r"\bstudy\s+materials?\b",
+            r"\bnotes?\b",
+            r"\bpdfs?\b",
+            r"\bacademic\s+resources?\b",
+            r"\blecture\s+notes?\b",
+            r"\bclass\s+notes?\b",
+            r"\bsyllabus\b",
+            r"\bsem(?:ester)?\s*[1-8]\b",
+            r"\b[1-8](?:st|nd|rd|th)?\s*sem(?:ester)?\b",
+        ]
+        
+        if any(re.search(pattern, text) for pattern in academic_patterns):
+            return "Please visit this website: acad-assist.vercel.app"
+
         if not self.is_configured or not self.client:
             return (
-                "I am the GLUG Chatbot. I can help you find Previous Year Questions (PYQs). "
-                "Please ask for 'PYQs' or specify a semester/subject (e.g., 'Give me DSA PYQs').\n\n"
+                "I am the GLUG Chatbot. If you are looking for PYQs or academic resources, "
+                "please visit this website: acad-assist.vercel.app\n\n"
                 "*Note: To enable general AI conversation, please configure your GEMINI_API_KEY in the .env file.*"
             )
         
@@ -32,8 +56,10 @@ class LLMService:
             config = types.GenerateContentConfig(
                 system_instruction=(
                     "You are the GLUG Chatbot of NIT Durgapur. Be polite, friendly, and helpful. "
-                    "If the user asks for PYQs or study materials, guide them to ask for specific semesters or subjects "
-                    "so the system can fetch direct links."
+                    "If the user asks for Previous Year Questions (PYQs), Previous Year Papers, Study Materials, "
+                    "Notes, PDFs, or any academic resource, you must immediately respond with: "
+                    "'Please visit this website: acad-assist.vercel.app' without searching or retrieving "
+                    "content from any other source."
                 ),
                 temperature=0.7,
             )

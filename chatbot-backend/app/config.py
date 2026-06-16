@@ -10,9 +10,4 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     DEFAULT_MODEL: str = "gemini-1.5-flash"
 
-    # Google Drive configuration
-    GD_FOLDER_ID: str = ""
-    GD_CREDENTIALS_PATH: str = "credentials.json"
-
 settings = Settings()
-
