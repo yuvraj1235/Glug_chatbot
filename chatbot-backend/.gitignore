@@ -1,0 +1,22 @@
+# Environment Variables (CRITICAL: Never leak your API keys)
+.env
+
+# Python Virtual Environment
+venv/
+.venv/
+env/
+
+# Vector Database / Local Storage
+chroma_data/
+
+# Python bytecode and cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Operating System files
+.DS_Store
+Thumbs.db

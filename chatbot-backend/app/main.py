@@ -1,10 +1,9 @@
 from fastapi import FastAPI
-from app.routes.chat import router as chat_router
+from app.routes import chat, ingest
 
-app = FastAPI(title="Club Chatbot API")
+# This is the "app" that Uvicorn is looking for!
+app = FastAPI(title="GLUG Chatbot API")
 
-app.include_router(chat_router)
-
-@app.get("/health")
-async def root():
-    return {"status": "server running"}
+# Attach your routers to the main app
+app.include_router(chat.router)
+app.include_router(ingest.router)
