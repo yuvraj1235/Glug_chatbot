@@ -1,0 +1,62 @@
+{
+  "/home/yuvlux/Glug_chatbot/chatbot-backend/app/config.py": {
+    "mtime": 1782044092.4337854,
+    "ast_hash": "4997b9aa295a968136ea730a72359b42",
+    "semantic_hash": ""
+  },
+  "/home/yuvlux/Glug_chatbot/chatbot-backend/app/main.py": {
+    "mtime": 1782041434.651665,
+    "ast_hash": "62d14bf8f93e56b943951770a3a18bd8",
+    "semantic_hash": ""
+  },
+  "/home/yuvlux/Glug_chatbot/chatbot-backend/app/routes/chat.py": {
+    "mtime": 1782027327.120136,
+    "ast_hash": "aca833d02b868b245d9b5cea44776cba",
+    "semantic_hash": ""
+  },
+  "/home/yuvlux/Glug_chatbot/chatbot-backend/app/routes/ingest.py": {
+    "mtime": 1782035450.055299,
+    "ast_hash": "5af935239d54becf31eeb0661650cc90",
+    "semantic_hash": ""
+  },
+  "/home/yuvlux/Glug_chatbot/chatbot-backend/app/schemas/chat.py": {
+    "mtime": 1782027327.1206381,
+    "ast_hash": "02f5b4808193d7ccda1b6b1cc53335b6",
+    "semantic_hash": ""
+  },
+  "/home/yuvlux/Glug_chatbot/chatbot-backend/app/services/api_scraper.py": {
+    "mtime": 1782041508.3526046,
+    "ast_hash": "1b2c47d4f0ebe794d28af3c82f6725f5",
+    "semantic_hash": ""
+  },
+  "/home/yuvlux/Glug_chatbot/chatbot-backend/app/services/llm.py": {
+    "mtime": 1782044779.5639703,
+    "ast_hash": "11e8ed095359efc417e229be0bff63fd",
+    "semantic_hash": ""
+  },
+  "/home/yuvlux/Glug_chatbot/chatbot-backend/app/services/pyq.py": {
+    "mtime": 1782027327.1326153,
+    "ast_hash": "29b8b400e7c74fd6b7e12bd478ed8ffe",
+    "semantic_hash": ""
+  },
+  "/home/yuvlux/Glug_chatbot/chatbot-backend/app/services/vector_db.py": {
+    "mtime": 1782040783.528899,
+    "ast_hash": "94d4e1c9b71506004e2d1ce17db553cc",
+    "semantic_hash": ""
+  },
+  "/home/yuvlux/Glug_chatbot/README.md": {
+    "mtime": 1782027327.1176155,
+    "ast_hash": "07ea00df49c12ccfa6efb60212b97c49",
+    "semantic_hash": ""
+  },
+  "/home/yuvlux/Glug_chatbot/chatbot-backend/README.md": {
+    "mtime": 1782027327.1186154,
+    "ast_hash": "78916f79e9cf96646bfae4d541b5f78a",
+    "semantic_hash": ""
+  },
+  "/home/yuvlux/Glug_chatbot/chatbot-backend/requirements.txt": {
+    "mtime": 1782041364.606377,
+    "ast_hash": "463c785915d382dea835757a5a1e9c87",
+    "semantic_hash": ""
+  }
+}

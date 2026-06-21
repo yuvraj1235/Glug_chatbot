@@ -1,0 +1,1032 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "label": "config.py",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/config.py",
+      "source_location": "L1",
+      "id": "app_config",
+      "community": 6,
+      "norm_label": "config.py"
+    },
+    {
+      "label": "Settings",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/config.py",
+      "source_location": "L8",
+      "id": "app_config_settings",
+      "community": 6,
+      "norm_label": "settings"
+    },
+    {
+      "label": "BaseSettings",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "id": "basesettings",
+      "community": 6,
+      "norm_label": "basesettings"
+    },
+    {
+      "label": "main.py",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/main.py",
+      "source_location": "L1",
+      "id": "app_main",
+      "community": 9,
+      "norm_label": "main.py"
+    },
+    {
+      "label": "chat.py",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/routes/chat.py",
+      "source_location": "L1",
+      "id": "routes_chat",
+      "community": 1,
+      "norm_label": "chat.py"
+    },
+    {
+      "label": "chat()",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/routes/chat.py",
+      "source_location": "L9",
+      "id": "routes_chat_chat",
+      "community": 1,
+      "norm_label": "chat()"
+    },
+    {
+      "label": "ChatRequest",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/routes/chat.py",
+      "source_location": "L9",
+      "id": "chatrequest",
+      "community": 1,
+      "norm_label": "chatrequest"
+    },
+    {
+      "label": "LLMService",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/routes/chat.py",
+      "source_location": "L9",
+      "id": "llmservice",
+      "community": 1,
+      "norm_label": "llmservice"
+    },
+    {
+      "label": "ingest.py",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/routes/ingest.py",
+      "source_location": "L1",
+      "id": "routes_ingest",
+      "community": 0,
+      "norm_label": "ingest.py"
+    },
+    {
+      "label": "ingest_data()",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/routes/ingest.py",
+      "source_location": "L7",
+      "id": "routes_ingest_ingest_data",
+      "community": 0,
+      "norm_label": "ingest_data()"
+    },
+    {
+      "label": "chat.py",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/schemas/chat.py",
+      "source_location": "L1",
+      "id": "schemas_chat",
+      "community": 4,
+      "norm_label": "chat.py"
+    },
+    {
+      "label": "ChatRequest",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/schemas/chat.py",
+      "source_location": "L3",
+      "id": "schemas_chat_chatrequest",
+      "community": 4,
+      "norm_label": "chatrequest"
+    },
+    {
+      "label": "BaseModel",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "id": "basemodel",
+      "community": 4,
+      "norm_label": "basemodel"
+    },
+    {
+      "label": "ChatResponse",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/schemas/chat.py",
+      "source_location": "L6",
+      "id": "schemas_chat_chatresponse",
+      "community": 4,
+      "norm_label": "chatresponse"
+    },
+    {
+      "label": "api_scraper.py",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/services/api_scraper.py",
+      "source_location": "L1",
+      "id": "services_api_scraper",
+      "community": 0,
+      "norm_label": "api_scraper.py"
+    },
+    {
+      "label": "clean_html()",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/services/api_scraper.py",
+      "source_location": "L40",
+      "id": "services_api_scraper_clean_html",
+      "community": 0,
+      "norm_label": "clean_html()"
+    },
+    {
+      "label": "str",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/services/api_scraper.py",
+      "source_location": "L40",
+      "id": "chatbot_backend_app_services_api_scraper_py_str",
+      "community": 0,
+      "norm_label": "str"
+    },
+    {
+      "label": "extract_text_deduplicated()",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/services/api_scraper.py",
+      "source_location": "L47",
+      "id": "services_api_scraper_extract_text_deduplicated",
+      "community": 0,
+      "norm_label": "extract_text_deduplicated()"
+    },
+    {
+      "label": "scrape_all_endpoints()",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/services/api_scraper.py",
+      "source_location": "L74",
+      "id": "services_api_scraper_scrape_all_endpoints",
+      "community": 0,
+      "norm_label": "scrape_all_endpoints()"
+    },
+    {
+      "label": "Removes HTML tags and normalizes whitespace.",
+      "file_type": "rationale",
+      "source_file": "chatbot-backend/app/services/api_scraper.py",
+      "source_location": "L41",
+      "id": "services_api_scraper_rationale_41",
+      "community": 0,
+      "norm_label": "removes html tags and normalizes whitespace."
+    },
+    {
+      "label": "Recursively extracts all meaningful text values from nested JSON data strings,",
+      "file_type": "rationale",
+      "source_file": "chatbot-backend/app/services/api_scraper.py",
+      "source_location": "L48",
+      "id": "services_api_scraper_rationale_48",
+      "community": 0,
+      "norm_label": "recursively extracts all meaningful text values from nested json data strings,"
+    },
+    {
+      "label": "Scrapes all endpoints, processes data into vector documents, and stores them in",
+      "file_type": "rationale",
+      "source_file": "chatbot-backend/app/services/api_scraper.py",
+      "source_location": "L75",
+      "id": "services_api_scraper_rationale_75",
+      "community": 0,
+      "norm_label": "scrapes all endpoints, processes data into vector documents, and stores them in"
+    },
+    {
+      "label": "llm.py",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/services/llm.py",
+      "source_location": "L1",
+      "id": "services_llm",
+      "community": 1,
+      "norm_label": "llm.py"
+    },
+    {
+      "label": "LLMService",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/services/llm.py",
+      "source_location": "L14",
+      "id": "services_llm_llmservice",
+      "community": 1,
+      "norm_label": "llmservice"
+    },
+    {
+      "label": ".__init__()",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/services/llm.py",
+      "source_location": "L15",
+      "id": "services_llm_llmservice_init",
+      "community": 1,
+      "norm_label": ".__init__()"
+    },
+    {
+      "label": ".generate_response()",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/services/llm.py",
+      "source_location": "L54",
+      "id": "services_llm_llmservice_generate_response",
+      "community": 1,
+      "norm_label": ".generate_response()"
+    },
+    {
+      "label": "str",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/services/llm.py",
+      "source_location": "L54",
+      "id": "chatbot_backend_app_services_llm_py_str",
+      "community": 1,
+      "norm_label": "str"
+    },
+    {
+      "label": "get_llm_service()",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/services/llm.py",
+      "source_location": "L153",
+      "id": "services_llm_get_llm_service",
+      "community": 1,
+      "norm_label": "get_llm_service()"
+    },
+    {
+      "label": "pyq.py",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/services/pyq.py",
+      "source_location": "L1",
+      "id": "services_pyq",
+      "community": 5,
+      "norm_label": "pyq.py"
+    },
+    {
+      "label": "get_pyq_response()",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/services/pyq.py",
+      "source_location": "L4",
+      "id": "services_pyq_get_pyq_response",
+      "community": 5,
+      "norm_label": "get_pyq_response()"
+    },
+    {
+      "label": "str",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/services/pyq.py",
+      "source_location": "L4",
+      "id": "chatbot_backend_app_services_pyq_py_str",
+      "community": 5,
+      "norm_label": "str"
+    },
+    {
+      "label": "Checks if the user's message is asking for PYQs, Previous Year Papers,     Study",
+      "file_type": "rationale",
+      "source_file": "chatbot-backend/app/services/pyq.py",
+      "source_location": "L5",
+      "id": "services_pyq_rationale_5",
+      "community": 5,
+      "norm_label": "checks if the user's message is asking for pyqs, previous year papers,     study"
+    },
+    {
+      "label": "vector_db.py",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/services/vector_db.py",
+      "source_location": "L1",
+      "id": "services_vector_db",
+      "community": 8,
+      "norm_label": "vector_db.py"
+    },
+    {
+      "label": "store_documents_in_supabase()",
+      "file_type": "code",
+      "source_file": "chatbot-backend/app/services/vector_db.py",
+      "source_location": "L18",
+      "id": "services_vector_db_store_documents_in_supabase",
+      "community": 8,
+      "norm_label": "store_documents_in_supabase()"
+    },
+    {
+      "label": "README.md",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L1",
+      "id": "readme",
+      "community": 7,
+      "norm_label": "readme.md"
+    },
+    {
+      "label": "Glug_chatbot",
+      "file_type": "document",
+      "source_file": "README.md",
+      "source_location": "L1",
+      "id": "readme_glug_chatbot",
+      "community": 7,
+      "norm_label": "glug_chatbot"
+    },
+    {
+      "label": "README.md",
+      "file_type": "document",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L1",
+      "id": "chatbot_backend_readme",
+      "community": 2,
+      "norm_label": "readme.md"
+    },
+    {
+      "label": "Glug Chatbot Backend",
+      "file_type": "document",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L1",
+      "id": "chatbot_backend_readme_glug_chatbot_backend",
+      "community": 2,
+      "norm_label": "glug chatbot backend"
+    },
+    {
+      "label": "Features",
+      "file_type": "document",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L5",
+      "id": "chatbot_backend_readme_features",
+      "community": 2,
+      "norm_label": "features"
+    },
+    {
+      "label": "Directory Structure",
+      "file_type": "document",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L15",
+      "id": "chatbot_backend_readme_directory_structure",
+      "community": 2,
+      "norm_label": "directory structure"
+    },
+    {
+      "label": "Setup & Installation",
+      "file_type": "document",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L34",
+      "id": "chatbot_backend_readme_setup_installation",
+      "community": 2,
+      "norm_label": "setup & installation"
+    },
+    {
+      "label": "1. Prerequisites",
+      "file_type": "document",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L36",
+      "id": "chatbot_backend_readme_1_prerequisites",
+      "community": 2,
+      "norm_label": "1. prerequisites"
+    },
+    {
+      "label": "2. Install Dependencies",
+      "file_type": "document",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L40",
+      "id": "chatbot_backend_readme_2_install_dependencies",
+      "community": 2,
+      "norm_label": "2. install dependencies"
+    },
+    {
+      "label": "3. Configure Environment Variables",
+      "file_type": "document",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L54",
+      "id": "chatbot_backend_readme_3_configure_environment_variables",
+      "community": 2,
+      "norm_label": "3. configure environment variables"
+    },
+    {
+      "label": "Running the Server",
+      "file_type": "document",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L72",
+      "id": "chatbot_backend_readme_running_the_server",
+      "community": 2,
+      "norm_label": "running the server"
+    },
+    {
+      "label": "API Endpoints",
+      "file_type": "document",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L87",
+      "id": "chatbot_backend_readme_api_endpoints",
+      "community": 3,
+      "norm_label": "api endpoints"
+    },
+    {
+      "label": "1. `POST /api/chat`",
+      "file_type": "document",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L89",
+      "id": "chatbot_backend_readme_1_post_api_chat",
+      "community": 3,
+      "norm_label": "1. `post /api/chat`"
+    },
+    {
+      "label": "Request Body",
+      "file_type": "document",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L92",
+      "id": "chatbot_backend_readme_request_body",
+      "community": 3,
+      "norm_label": "request body"
+    },
+    {
+      "label": "Standard Response",
+      "file_type": "document",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L110",
+      "id": "chatbot_backend_readme_standard_response",
+      "community": 3,
+      "norm_label": "standard response"
+    },
+    {
+      "label": "Streaming Response (SSE Format)",
+      "file_type": "document",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L119",
+      "id": "chatbot_backend_readme_streaming_response_sse_format",
+      "community": 3,
+      "norm_label": "streaming response (sse format)"
+    },
+    {
+      "label": "2. `GET /api/chat/models`",
+      "file_type": "document",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L132",
+      "id": "chatbot_backend_readme_2_get_api_chat_models",
+      "community": 3,
+      "norm_label": "2. `get /api/chat/models`"
+    },
+    {
+      "label": "License",
+      "file_type": "document",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L137",
+      "id": "chatbot_backend_readme_license",
+      "community": 2,
+      "norm_label": "license"
+    }
+  ],
+  "links": [
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/config.py",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "app_config",
+      "target": "app_config_settings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/api_scraper.py",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "services_api_scraper",
+      "target": "app_config",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/llm.py",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "services_llm",
+      "target": "app_config",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/config.py",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "app_config_settings",
+      "target": "basesettings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/routes/chat.py",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "routes_chat",
+      "target": "routes_chat_chat",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/routes/chat.py",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "routes_chat_chat",
+      "target": "chatrequest",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/routes/chat.py",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "routes_chat_chat",
+      "target": "llmservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "chatbot-backend/app/routes/chat.py",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "routes_chat_chat",
+      "target": "schemas_chat_chatresponse"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "chatbot-backend/app/routes/chat.py",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "routes_chat_chat",
+      "target": "services_pyq_get_pyq_response"
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "chatbot-backend/app/routes/chat.py",
+      "source_location": "L2",
+      "weight": 0.8,
+      "source": "chatrequest",
+      "target": "chatrequest",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "chatbot-backend/app/routes/chat.py",
+      "source_location": "L4",
+      "weight": 0.8,
+      "source": "chatrequest",
+      "target": "services_llm_llmservice",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "chatbot-backend/app/routes/chat.py",
+      "source_location": "L2",
+      "weight": 0.8,
+      "source": "llmservice",
+      "target": "chatrequest",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "uses",
+      "confidence": "INFERRED",
+      "source_file": "chatbot-backend/app/routes/chat.py",
+      "source_location": "L4",
+      "weight": 0.8,
+      "source": "llmservice",
+      "target": "services_llm_llmservice",
+      "confidence_score": 0.5
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/routes/ingest.py",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "routes_ingest",
+      "target": "routes_ingest_ingest_data",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "INFERRED",
+      "confidence_score": 0.8,
+      "source_file": "chatbot-backend/app/routes/ingest.py",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "routes_ingest_ingest_data",
+      "target": "services_api_scraper_scrape_all_endpoints"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/schemas/chat.py",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "schemas_chat",
+      "target": "schemas_chat_chatrequest",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/schemas/chat.py",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "schemas_chat",
+      "target": "schemas_chat_chatresponse",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/schemas/chat.py",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "schemas_chat_chatrequest",
+      "target": "basemodel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "inherits",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/schemas/chat.py",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "schemas_chat_chatresponse",
+      "target": "basemodel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/api_scraper.py",
+      "source_location": "L40",
+      "weight": 1.0,
+      "source": "services_api_scraper",
+      "target": "services_api_scraper_clean_html",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/api_scraper.py",
+      "source_location": "L47",
+      "weight": 1.0,
+      "source": "services_api_scraper",
+      "target": "services_api_scraper_extract_text_deduplicated",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/api_scraper.py",
+      "source_location": "L74",
+      "weight": 1.0,
+      "source": "services_api_scraper",
+      "target": "services_api_scraper_scrape_all_endpoints",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "return_type",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/api_scraper.py",
+      "source_location": "L40",
+      "weight": 1.0,
+      "source": "services_api_scraper_clean_html",
+      "target": "chatbot_backend_app_services_api_scraper_py_str",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/api_scraper.py",
+      "source_location": "L64",
+      "weight": 1.0,
+      "source": "services_api_scraper_extract_text_deduplicated",
+      "target": "services_api_scraper_clean_html",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/api_scraper.py",
+      "source_location": "L41",
+      "weight": 1.0,
+      "source": "services_api_scraper_rationale_41",
+      "target": "services_api_scraper_clean_html",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/api_scraper.py",
+      "source_location": "L48",
+      "weight": 1.0,
+      "source": "services_api_scraper_rationale_48",
+      "target": "services_api_scraper_extract_text_deduplicated",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/api_scraper.py",
+      "source_location": "L93",
+      "weight": 1.0,
+      "source": "services_api_scraper_scrape_all_endpoints",
+      "target": "services_api_scraper_extract_text_deduplicated",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/api_scraper.py",
+      "source_location": "L75",
+      "weight": 1.0,
+      "source": "services_api_scraper_rationale_75",
+      "target": "services_api_scraper_scrape_all_endpoints",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/llm.py",
+      "source_location": "L153",
+      "weight": 1.0,
+      "source": "services_llm",
+      "target": "services_llm_get_llm_service",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/llm.py",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "services_llm",
+      "target": "services_llm_llmservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "return_type",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/llm.py",
+      "source_location": "L153",
+      "weight": 1.0,
+      "source": "services_llm_get_llm_service",
+      "target": "services_llm_llmservice",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/llm.py",
+      "source_location": "L54",
+      "weight": 1.0,
+      "source": "services_llm_llmservice",
+      "target": "services_llm_llmservice_generate_response",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "method",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/llm.py",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "services_llm_llmservice",
+      "target": "services_llm_llmservice_init",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "return_type",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/llm.py",
+      "source_location": "L54",
+      "weight": 1.0,
+      "source": "services_llm_llmservice_generate_response",
+      "target": "chatbot_backend_app_services_llm_py_str",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/pyq.py",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "services_pyq",
+      "target": "services_pyq_get_pyq_response",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "generic_arg",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/pyq.py",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "services_pyq_get_pyq_response",
+      "target": "chatbot_backend_app_services_pyq_py_str",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/pyq.py",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "services_pyq_rationale_5",
+      "target": "services_pyq_get_pyq_response",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/app/services/vector_db.py",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "services_vector_db",
+      "target": "services_vector_db_store_documents_in_supabase",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "README.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "readme",
+      "target": "readme_glug_chatbot",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "chatbot_backend_readme",
+      "target": "chatbot_backend_readme_glug_chatbot_backend",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L87",
+      "weight": 1.0,
+      "source": "chatbot_backend_readme_glug_chatbot_backend",
+      "target": "chatbot_backend_readme_api_endpoints",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "chatbot_backend_readme_glug_chatbot_backend",
+      "target": "chatbot_backend_readme_directory_structure",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "chatbot_backend_readme_glug_chatbot_backend",
+      "target": "chatbot_backend_readme_features",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L137",
+      "weight": 1.0,
+      "source": "chatbot_backend_readme_glug_chatbot_backend",
+      "target": "chatbot_backend_readme_license",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L72",
+      "weight": 1.0,
+      "source": "chatbot_backend_readme_glug_chatbot_backend",
+      "target": "chatbot_backend_readme_running_the_server",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L34",
+      "weight": 1.0,
+      "source": "chatbot_backend_readme_glug_chatbot_backend",
+      "target": "chatbot_backend_readme_setup_installation",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L36",
+      "weight": 1.0,
+      "source": "chatbot_backend_readme_setup_installation",
+      "target": "chatbot_backend_readme_1_prerequisites",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L40",
+      "weight": 1.0,
+      "source": "chatbot_backend_readme_setup_installation",
+      "target": "chatbot_backend_readme_2_install_dependencies",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L54",
+      "weight": 1.0,
+      "source": "chatbot_backend_readme_setup_installation",
+      "target": "chatbot_backend_readme_3_configure_environment_variables",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L89",
+      "weight": 1.0,
+      "source": "chatbot_backend_readme_api_endpoints",
+      "target": "chatbot_backend_readme_1_post_api_chat",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L132",
+      "weight": 1.0,
+      "source": "chatbot_backend_readme_api_endpoints",
+      "target": "chatbot_backend_readme_2_get_api_chat_models",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L92",
+      "weight": 1.0,
+      "source": "chatbot_backend_readme_1_post_api_chat",
+      "target": "chatbot_backend_readme_request_body",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L110",
+      "weight": 1.0,
+      "source": "chatbot_backend_readme_1_post_api_chat",
+      "target": "chatbot_backend_readme_standard_response",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "chatbot-backend/README.md",
+      "source_location": "L119",
+      "weight": 1.0,
+      "source": "chatbot_backend_readme_1_post_api_chat",
+      "target": "chatbot_backend_readme_streaming_response_sse_format",
+      "confidence_score": 1.0
+    }
+  ],
+  "hyperedges": [],
+  "built_at_commit": "95684892f03f2bb178a6e1227ecd7c288e143d49"
+}
