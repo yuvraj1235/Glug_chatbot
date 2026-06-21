@@ -20,3 +20,4 @@ __pycache__/
 # Operating System files
 .DS_Store
 Thumbs.db
+graphify-out

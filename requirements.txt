@@ -8,8 +8,7 @@ httpx
 beautifulsoup4      
 langchain           
 langchain-community 
-langchain-huggingface 
-chromadb            
+langchain-huggingface           
 sentence-transformers 
 supabase
 
