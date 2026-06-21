@@ -7,7 +7,7 @@ from supabase.client import Client, create_client
 from langchain_community.vectorstores import SupabaseVectorStore
 from langchain_huggingface import HuggingFaceEndpointEmbeddings, HuggingFaceEndpoint, ChatHuggingFace
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain.retrievers import ContextualCompressionRetriever
+from langchain.retrievers.contextual_compression import ContextualCompressionRetriever
 from langchain_core.documents import BaseDocumentCompressor, Document
 from app.config import settings
 
