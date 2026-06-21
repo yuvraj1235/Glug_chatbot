@@ -1,13 +1,20 @@
 import httpx
 from bs4 import BeautifulSoup
 from langchain_core.documents import Document
-from langchain_community.vectorstores import Chroma
+from langchain_community.vectorstores import SupabaseVectorStore
 from langchain_huggingface import HuggingFaceEmbeddings
-import os
+from supabase.client import Client, create_client
+from app.config import settings
 
-# Initialize components
+# 1. Initialize Supabase Cloud configurations instead of CHROMA_PATH
+SUPABASE_URL = settings.SUPABASE_URL
+SUPABASE_SERVICE_KEY = settings.SUPABASE_SERVICE_KEY # Use service key to bypass RLS policies during writes
+
+supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY) if SUPABASE_URL and SUPABASE_SERVICE_KEY else None
+
+# Note: 'all-MiniLM-L6-v2' creates 384-dimensional vectors.
+# Ensure your column in Supabase is defined as: embedding vector(384)
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-CHROMA_PATH = os.path.join(os.path.dirname(__file__), "../../chroma_data")
 
 API_ENDPOINTS = {
     "events": "https://api.nitdgplug.org/api/events/",
@@ -56,7 +63,6 @@ def extract_text_deduplicated(data, current_key="") -> list:
     elif isinstance(data, str) and data.strip():
         cleaned = clean_html(data)
         if cleaned:
-            # Format nicely as "Key: Value" if key exists
             prefix = f"{current_key.replace('_', ' ').title()}: " if current_key else ""
             extracted.append(f"{prefix}{cleaned}")
     elif isinstance(data, (int, float, bool)):
@@ -66,34 +72,30 @@ def extract_text_deduplicated(data, current_key="") -> list:
     return extracted
 
 async def scrape_all_endpoints() -> dict:
-    """Scrapes all endpoints, processes data into vector documents, and stores them."""
+    """Scrapes all endpoints, processes data into vector documents, and stores them in Supabase."""
     all_documents = []
     summary_results = {}
 
     async with httpx.AsyncClient() as client:
         for source_name, url in API_ENDPOINTS.items():
             try:
-                # Handle potential 404s or incomplete backend routes gracefully
                 response = await client.get(url, timeout=10.0)
                 if response.status_code != 200:
                     summary_results[source_name] = f"Skipped (Status {response.status_code})"
                     continue
 
                 items = response.json()
-                # Ensure we are wrapping single object responses into a list loop safely
                 if isinstance(items, dict):
                     items = [items]
 
                 source_docs_count = 0
                 for item in items:
-                    # Flatten the JSON item into structured sentences
                     text_parts = extract_text_deduplicated(item)
                     if not text_parts:
                         continue
                     
                     combined_text = "\n".join(text_parts)
                     
-                    # Store with metadata so the LLM can reference the right section
                     doc = Document(
                         page_content=combined_text,
                         metadata={"source": source_name, "url": url}
@@ -106,9 +108,16 @@ async def scrape_all_endpoints() -> dict:
             except Exception as e:
                 summary_results[source_name] = f"Failed: {str(e)}"
 
-    # Batch save all documents to ChromaDB if any were recovered
+    # 2. Replaced Chroma initialization with SupabaseVectorStore
     if all_documents:
-        db = Chroma.from_documents(all_documents, embeddings, persist_directory=CHROMA_PATH)
+        SupabaseVectorStore.from_documents(
+            documents=all_documents,
+            embedding=embeddings,
+            client=supabase_client,
+            table_name="documents",           # Your target pgvector table name
+            query_name="match_documents",      # The custom similarity RPC function
+            chunk_size=500                    # Batch uploads to protect cloud memory limits
+        )
         return {
             "status": "Success",
             "details": summary_results,

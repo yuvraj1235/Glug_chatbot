@@ -1,4 +1,4 @@
-#!/home/nishant-pandey/chatbot/Glug_chatbot/chatbot-backend/venv/bin/python3
+#!/home/yuvlux/Glug_chatbot/chatbot-backend/venv/bin/python
 # -*- coding: utf-8 -*-
 import re
 import sys
