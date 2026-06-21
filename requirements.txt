@@ -8,8 +8,6 @@ httpx
 beautifulsoup4      
 langchain           
 langchain-community 
-langchain-huggingface           
-sentence-transformers 
+langchain-google-genai>=1.0.0
+langchain-huggingface
 supabase
-
-

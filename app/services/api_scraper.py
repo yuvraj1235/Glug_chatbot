@@ -2,19 +2,21 @@ import httpx
 from bs4 import BeautifulSoup
 from langchain_core.documents import Document
 from langchain_community.vectorstores import SupabaseVectorStore
-from langchain_huggingface import HuggingFaceEmbeddings
+# 1. FIXED: Swapped to the correct non-deprecated module from langchain_huggingface
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from supabase.client import Client, create_client
 from app.config import settings
 
-# 1. Initialize Supabase Cloud configurations instead of CHROMA_PATH
 SUPABASE_URL = settings.SUPABASE_URL
-SUPABASE_SERVICE_KEY = settings.SUPABASE_SERVICE_KEY # Use service key to bypass RLS policies during writes
+SUPABASE_SERVICE_KEY = settings.SUPABASE_SERVICE_KEY 
 
 supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY) if SUPABASE_URL and SUPABASE_SERVICE_KEY else None
 
-# Note: 'all-MiniLM-L6-v2' creates 384-dimensional vectors.
-# Ensure your column in Supabase is defined as: embedding vector(384)
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+# 2. FIXED: Use HuggingFaceEndpointEmbeddings for direct Serverless Cloud Calls
+embeddings = HuggingFaceEndpointEmbeddings(
+    model="sentence-transformers/all-MiniLM-L6-v2",
+    huggingfacehub_api_token=settings.HUGGINGFACEHUB_API_TOKEN
+)
 
 API_ENDPOINTS = {
     "events": "https://api.nitdgplug.org/api/events/",
@@ -38,37 +40,36 @@ API_ENDPOINTS = {
 }
 
 def clean_html(html_content: str) -> str:
-    """Removes HTML tags and normalizes whitespace."""
+    """Removes HTML tags and returns clean text content."""
     if not html_content:
         return ""
     soup = BeautifulSoup(html_content, "html.parser")
-    return " ".join(soup.get_text().split())
+    return soup.get_text(separator=" ").strip()
 
-def extract_text_deduplicated(data, current_key="") -> list:
-    """
-    Recursively extracts all meaningful text values from nested JSON data strings,
-    ignoring common non-informative metadata keys.
-    """
-    ignored_keys = {"id", "image", "avatar", "created_at", "updated_at", "link", "url", "email"}
+def extract_text_deduplicated(data) -> list:
+    """Recursively extracts values from JSON payloads while keeping text unique."""
     extracted = []
+    seen = set()
 
-    if isinstance(data, dict):
-        for key, value in data.items():
-            if key in ignored_keys:
-                continue
-            extracted.extend(extract_text_deduplicated(value, key))
-    elif isinstance(data, list):
-        for item in data:
-            extracted.extend(extract_text_deduplicated(item, current_key))
-    elif isinstance(data, str) and data.strip():
-        cleaned = clean_html(data)
-        if cleaned:
-            prefix = f"{current_key.replace('_', ' ').title()}: " if current_key else ""
-            extracted.append(f"{prefix}{cleaned}")
-    elif isinstance(data, (int, float, bool)):
-        if current_key not in ignored_keys:
-            extracted.append(f"{current_key.replace('_', ' ').title()}: {data}")
+    def recurse(node):
+        if isinstance(node, dict):
+            for key, val in node.items():
+                if key in ["id", "image", "logo", "avatar", "icon", "url"] and isinstance(val, (int, str)):
+                    continue
+                recurse(val)
+        elif isinstance(node, list):
+            for item in node:
+                recurse(item)
+        elif isinstance(node, (str, int, float)):
+            val_str = str(node).strip()
+            if "<" in val_str and ">" in val_str:
+                val_str = clean_html(val_str)
             
+            if val_str and val_str not in seen and len(val_str) > 1:
+                seen.add(val_str)
+                extracted.append(val_str)
+
+    recurse(data)
     return extracted
 
 async def scrape_all_endpoints() -> dict:
@@ -108,15 +109,14 @@ async def scrape_all_endpoints() -> dict:
             except Exception as e:
                 summary_results[source_name] = f"Failed: {str(e)}"
 
-    # 2. Replaced Chroma initialization with SupabaseVectorStore
     if all_documents:
         SupabaseVectorStore.from_documents(
             documents=all_documents,
             embedding=embeddings,
             client=supabase_client,
-            table_name="documents",           # Your target pgvector table name
-            query_name="match_documents",      # The custom similarity RPC function
-            chunk_size=500                    # Batch uploads to protect cloud memory limits
+            table_name="documents",           
+            query_name="match_documents",      
+            chunk_size=200  
         )
         return {
             "status": "Success",
