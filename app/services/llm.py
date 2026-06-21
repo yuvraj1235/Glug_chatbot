@@ -1,14 +1,61 @@
 import logging
 import os
 import re
+import httpx
+from typing import Sequence
 from supabase.client import Client, create_client
 from langchain_community.vectorstores import SupabaseVectorStore
 from langchain_huggingface import HuggingFaceEndpointEmbeddings, HuggingFaceEndpoint, ChatHuggingFace
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain_core.documents import BaseDocumentCompressor, Document
 from app.config import settings
 
 logger = logging.getLogger("chatbot")
 
+# --- CUSTOM FREE HUGGING FACE RERANKER ---
+class HFServerlessReranker(BaseDocumentCompressor):
+    api_token: str
+    model_name: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    top_n: int = 4
+
+    def compress_documents(self, documents: Sequence[Document], query: str) -> Sequence[Document]:
+        if not documents:
+            return []
+            
+        url = f"https://api-inference.huggingface.co/models/{self.model_name}"
+        headers = {"Authorization": f"Bearer {self.api_token}"}
+        
+        # Structure the payload exactly how Hugging Face's cross-encoder task expects it
+        payload = {
+            "inputs": [{"text": query, "text_pair": doc.page_content} for doc in documents]
+        }
+        
+        try:
+            with httpx.Client() as client:
+                response = client.post(url, headers=headers, json=payload, timeout=10.0)
+                
+            if response.status_code != 200:
+                logger.warning(f"HF Reranker API returned status {response.status_code}. Using fallback ranking.")
+                return documents[:self.top_n]
+                
+            scores = response.json()
+            
+            # If the response returns a list of scores, pair them up and sort
+            if isinstance(scores, list):
+                # Handle cases where API returns a list of dicts like [{'score': 0.9}, ...]
+                parsed_scores = [s['score'] if isinstance(s, dict) else float(s) for s in scores]
+                
+                scored_docs = sorted(zip(documents, parsed_scores), key=lambda x: x[1], reverse=True)
+                return [doc for doc, score in scored_docs[:self.top_n]]
+                
+            return documents[:self.top_n]
+        except Exception as e:
+            logger.error(f"HF Reranker execution failed: {e}. Falling back to baseline retrieval.")
+            return documents[:self.top_n]
+
+
+# --- LLM SERVICE WITH TWO-STAGE RAG RETRIEVAL ---
 class LLMService:
     def __init__(self):
         # Initialize Vector Database connection
@@ -24,6 +71,7 @@ class LLMService:
             if not supabase_url or not supabase_key:
                 logger.error("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY in settings configuration.")
                 self.db = None
+                self.retriever = None
             else:
                 self.supabase_client: Client = create_client(supabase_url, supabase_key)
                 self.db = SupabaseVectorStore(
@@ -32,10 +80,30 @@ class LLMService:
                     table_name="documents",
                     query_name="match_documents"
                 )
-                logger.info("Supabase Vector DB successfully connected to LLMService.")
+                
+                # Stage 1: Broad search to extract top 20 candidate text blocks
+                base_retriever = self.db.as_retriever(
+                    search_type="similarity",
+                    search_kwargs={"k": 20}
+                )
+                
+                # Stage 2: Custom Serverless Cross-Encoder pipeline
+                compressor = HFServerlessReranker(
+                    api_token=settings.HUGGINGFACEHUB_API_TOKEN,
+                    model_name="cross-encoder/ms-marco-MiniLM-L-6-v2",
+                    top_n=4  # Compress the broad net down to the 4 best records
+                )
+                
+                self.retriever = ContextualCompressionRetriever(
+                    base_compressor=compressor, 
+                    base_retriever=base_retriever
+                )
+                
+                logger.info("Supabase Vector DB and HF Reranker pipeline successfully initialized.")
         except Exception as e:
-            logger.error(f"Error connecting to Supabase Vector DB: {e}")
+            logger.error(f"Error connecting to Supabase Vector DB / Reranker: {e}")
             self.db = None
+            self.retriever = None
 
         # Wrap endpoint with ChatHuggingFace to support conversational task routing
         try:
@@ -84,35 +152,16 @@ class LLMService:
                 "*Note: Hugging Face Cloud client is not configured properly.*"
             )
         
-        # Pull text blocks directly from Supabase using Strict Server-Side Filtering
         context_string = ""
-        try:
-            is_profile_query = any(w in text for w in ["member", "profile", "team", "year", "who is", "alumni", "coordinator"])
-            is_event_query = any(w in text for w in ["event", "audition", "talk", "upcoming", "past"])
-            
-            context_chunks = []
-            
-            if is_profile_query:
-                prof_resp = self.supabase_client.table("documents").select("content").ilike("metadata->>url", "%profile%").limit(50).execute()
-                alum_resp = self.supabase_client.table("documents").select("content").ilike("metadata->>url", "%alumni%").limit(20).execute()
-                
-                for row in (prof_resp.data or []) + (alum_resp.data or []):
-                    context_chunks.append(row['content'])
-                    
-            elif is_event_query:
-                event_resp = self.supabase_client.table("documents").select("content").ilike("metadata->>url", "%event%").limit(40).execute()
-                for row in event_resp.data or []:
-                    context_chunks.append(row['content'])
-            else:
-                general_resp = self.supabase_client.table("documents").select("content").limit(30).execute()
-                for row in general_resp.data or []:
-                    context_chunks.append(row['content'])
-                    
-            context_string = "\n\n---\n\n".join(context_chunks)
-            print(f"\n🚀 [DEBUG] Extracted Context Rows for LLM: {len(context_chunks)}")
-            
-        except Exception as e:
-            logger.error(f"Error querying Supabase rows: {e}")
+        if self.retriever:
+            try:
+                # Runs similarity search then passes candidates through the custom cloud cross-encoder wrapper
+                compressed_docs = await self.retriever.ainvoke(message)
+                context_chunks = [doc.page_content for doc in compressed_docs]
+                context_string = "\n\n---\n\n".join(context_chunks)
+                print(f"\n🚀 [DEBUG] Reranked Context Chunks for LLM: {len(context_chunks)}")
+            except Exception as e:
+                logger.error(f"Error executing compression pipeline retrieval: {e}")
             
         system_instruction = (
             "You are the official GLUG Chatbot of NIT Durgapur. Be polite, friendly, and helpful. "
@@ -143,9 +192,7 @@ class LLMService:
             return f"Sorry, I encountered an error while processing your request: {str(e)}"
 
 # --- EXPORTS ---
-# Create the global instance 
 llm_service = LLMService()
 
-# Provide the specific initialization hook the router looks for
 def get_llm_service() -> LLMService:
     return llm_service
