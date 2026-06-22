@@ -1,23 +1,28 @@
 import logging
-import httpx
+import asyncio
 from typing import Optional, Sequence, Any
 from langchain_core.documents import BaseDocumentCompressor, Document
 from langchain_core.callbacks import Callbacks
-from pydantic import Field 
+from pydantic import Field, PrivateAttr
 
 logger = logging.getLogger("chatbot")
 
-class HFServerlessReranker(BaseDocumentCompressor):
-    api_token: str
-    model_name: str = Field(default="cross-encoder/ms-marco-MiniLM-L-6-v2")
+class FlashRankReranker(BaseDocumentCompressor):
+    model_name: str = Field(default="ms-marco-MiniLM-L-6-v2")
     top_n: int = Field(default=4)
+    
+    # PrivateAttr tells Pydantic to ignore this field during schema validation
+    _ranker: Any = PrivateAttr()
 
-    model_config = {
-        "protected_namespaces": (),
-    }
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        from flashrank import Ranker
+        logger.info(f"Initializing FlashRank with local model: {self.model_name}")
+        # This downloads the ~85MB model directly into your container the first time it boots
+        self._ranker = Ranker(model_name=self.model_name)
 
     # ==========================================
-    # 1. SYNCHRONOUS METHOD (Fallback/LangChain Sync)
+    # 1. SYNCHRONOUS METHOD (Core Logic)
     # ==========================================
     def compress_documents(
         self,
@@ -28,40 +33,35 @@ class HFServerlessReranker(BaseDocumentCompressor):
         if not documents:
             return []
 
-        url = f"https://api-inference.huggingface.co/models/{self.model_name}"
-        headers = {
-            "Authorization": f"Bearer {self.api_token}",
-            "Content-Type": "application/json"
-        }
-
-        payload = {
-            "inputs": [{"text": query, "text_pair": doc.page_content} for doc in documents]
-        }
+        from flashrank import RerankRequest
+        
+        # FlashRank expects passages formatted as a list of dictionaries
+        passages = [
+            {"id": i, "text": doc.page_content, "metadata": doc.metadata}
+            for i, doc in enumerate(documents)
+        ]
 
         try:
-            # FORCE IPv4 to fix Docker DNS [Errno -5]
-            transport = httpx.HTTPTransport(local_address="0.0.0.0")
+            req = RerankRequest(query=query, passages=passages)
+            results = self._ranker.rerank(req)
             
-            # Use standard Client for the synchronous method
-            with httpx.Client(transport=transport) as client:
-                response = client.post(url, headers=headers, json=payload, timeout=15.0)
-
-            if response.status_code != 200:
-                logger.warning(f"HF Reranker API returned status {response.status_code}. Using fallback.")
-                return list(documents)[:self.top_n]
-
-            scores = response.json()
-            parsed_scores = self._parse_scores(scores)
-
-            scored_docs = sorted(zip(documents, parsed_scores), key=lambda x: x[1], reverse=True)
-            return [doc for doc, score in scored_docs[:self.top_n]]
-
+            # Re-map the sorted results back to LangChain Document objects
+            reranked_docs = []
+            for res in results[:self.top_n]:
+                doc_id = res["id"]
+                original_doc = documents[doc_id]
+                # Inject the local FlashRank score into the document metadata for debugging
+                original_doc.metadata["relevance_score"] = res["score"]
+                reranked_docs.append(original_doc)
+                
+            return reranked_docs
+            
         except Exception as e:
-            logger.error(f"HF Reranker sync execution failed: {e}. Falling back to baseline.")
+            logger.error(f"FlashRank execution failed: {e}. Falling back to baseline.")
             return list(documents)[:self.top_n]
 
     # ==========================================
-    # 2. ASYNCHRONOUS METHOD (Used by your FastAPI app)
+    # 2. ASYNCHRONOUS METHOD (FastAPI non-blocking wrapper)
     # ==========================================
     async def acompress_documents(
         self,
@@ -69,55 +69,15 @@ class HFServerlessReranker(BaseDocumentCompressor):
         query: str,
         callbacks: Optional[Callbacks] = None,
     ) -> Sequence[Document]:
+        """Runs the synchronous FlashRank CPU calculations in a background thread to prevent pausing your server."""
         if not documents:
             return []
-
-        url = f"https://api-inference.huggingface.co/models/{self.model_name}"
-        headers = {
-            "Authorization": f"Bearer {self.api_token}",
-            "Content-Type": "application/json"
-        }
-
-        payload = {
-            "inputs": [{"text": query, "text_pair": doc.page_content} for doc in documents]
-        }
-
-        try:
-            # FORCE IPv4 for Async requests to fix Docker DNS [Errno -5]
-            transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0")
             
-            # Use AsyncClient with 'async with' and 'await'
-            async with httpx.AsyncClient(transport=transport) as client:
-                response = await client.post(url, headers=headers, json=payload, timeout=15.0)
-
-            if response.status_code != 200:
-                logger.warning(f"HF Reranker API returned status {response.status_code}. Using fallback.")
-                return list(documents)[:self.top_n]
-
-            scores = response.json()
-            parsed_scores = self._parse_scores(scores)
-
-            scored_docs = sorted(zip(documents, parsed_scores), key=lambda x: x[1], reverse=True)
-            return [doc for doc, score in scored_docs[:self.top_n]]
-
-        except Exception as e:
-            logger.error(f"HF Reranker async execution failed: {e}. Falling back to baseline.")
-            return list(documents)[:self.top_n]
-
-    # ==========================================
-    # 3. HELPER METHOD (To avoid repeating code)
-    # ==========================================
-    def _parse_scores(self, scores: Any) -> list[float]:
-        """Safely extracts scores from HF's unpredictable JSON formats."""
-        parsed_scores = []
-        if isinstance(scores, list):
-            for s in scores:
-                if isinstance(s, dict):
-                    parsed_scores.append(s.get('score', 0.0))
-                elif isinstance(s, list) and len(s) > 0 and isinstance(s[0], dict):
-                    parsed_scores.append(s[0].get('score', 0.0))
-                else:
-                    parsed_scores.append(float(s))
-        else:
-            raise ValueError(f"Unexpected response format from HF API: {scores}")
-        return parsed_scores
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, 
+            self.compress_documents, 
+            documents, 
+            query, 
+            callbacks
+        )

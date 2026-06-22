@@ -6,7 +6,6 @@ from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
 from app.config import settings
-from app.services.reranking import HFServerlessReranker
 
 logger = logging.getLogger("chatbot")
 
@@ -29,20 +28,17 @@ class LLMService:
                 query_name="match_documents"
             )
             base_retriever = self.db.as_retriever(search_kwargs={"k": 20})
-            self.compressor = HFServerlessReranker(
-                api_token=settings.HUGGINGFACEHUB_API_TOKEN,
-                model_name="cross-encoder/ms-marco-MiniLM-L-6-v2",
-                top_n=4
-            )
+            
+            # Reranker disabled - using only vector DB relevance scoring
+            self.compressor = None
             self.retriever = base_retriever
-            logger.info("DB and retriever initialized successfully")
+            logger.info("DB and Retriever initialized successfully (reranker disabled)")
         except Exception as e:
-            logger.error(f"Error connecting to DB/Reranker: {e}")
+            logger.error(f"Error connecting to DB/Retriever: {e}")
             self.db, self.retriever = None, None
 
         # --- LLM ---
         try:
-            # Fallback handling in case DEFAULT_MODEL remains pointed to a Gemini string
             model_name = settings.DEFAULT_MODEL
             if "gemini" in model_name.lower():
                 model_name = "llama-3.1-8b-instant"
@@ -74,53 +70,53 @@ class LLMService:
             elif any(k in text for k in ["event", "workshop", "hackathon"]):
                 search_filter = {"source": "events"}
 
-            # 2. Year-based exact match boost (CAP AT 2 MATCHES)
+            # 2. Year-based exact match boost (CAP AT 1 MATCH)
             exact_match_docs = []
             years_in_prompt = re.findall(r'\b20\d{2}\b', text)
             if years_in_prompt:
                 broad_docs = await self.db.asimilarity_search(
-                    message, k=50,
+                    message, k=30,
                     filter=search_filter if search_filter else None
                 )
                 for doc in broad_docs:
                     if any(year in doc.page_content for year in years_in_prompt):
                         tagged = f"[VERIFIED PROFILE]\n{doc.page_content}"
                         exact_match_docs.append(tagged)
-                        # SAFEGUARD: Stop once we hit 2 exact matches
-                        if len(exact_match_docs) >= 2:
+                        if len(exact_match_docs) >= 1:
                             break
 
-            # 3. Reranked retrieval with explicit fallback safety
+            # 3. Local Reranked retrieval 
             compressed_docs = []
             if self.retriever:
                 self.retriever.search_kwargs = {
-                    "k": 15,
+                    "k": 10,  # Feed 10 documents to FlashRank to score locally
                     "filter": search_filter if search_filter else None
                 }
                 retrieved = await self.retriever.ainvoke(message)
                 
                 if hasattr(self, 'compressor') and self.compressor:
-                    # CRITICAL: Now using the asynchronous `acompress_documents`
+                    # Executes safely in an isolated threadpool to prevent blocking FastAPI
                     reranked = await self.compressor.acompress_documents(retrieved, message)
                     compressed_docs = [doc.page_content for doc in reranked]
                 else:
-                    logger.warning("Reranker unavailable. Slicing baseline retrieval to top 2 chunks.")
-                    compressed_docs = [doc.page_content for doc in retrieved[:2]]
+                    logger.debug("Reranker unavailable. Using baseline retrieval fallback.")
+                    compressed_docs = [doc.page_content for doc in retrieved[:1]]
 
-            # 4. Merge: year matches first, then reranked, deduplicated
+            # 4. Merge: year matches first, then reranked chunks, deduplicated
             final_chunks = exact_match_docs + [
                 c for c in compressed_docs if c not in exact_match_docs
             ]
             
-            # STRICT CEILING: Maximum 2 chunks total to stay under Groq limits
+            # Allowed up to 2 high-quality reranked chunks since FlashRank minimizes noise
             context_string = "\n\n---\n\n".join(final_chunks[:2])
 
-            # BRUTE FORCE SAFEGUARD: Force string below ~4000 tokens (approx 16000 chars)
-            if len(context_string) > 16000:
-                logger.warning(f"Context string too large ({len(context_string)} chars)! Truncating.")
-                context_string = context_string[:16000]
+            # AGGRESSIVE SAFEGUARD: Force context string below 8000 chars (~2000 tokens)
+            max_context_chars = 8000
+            if len(context_string) > max_context_chars:
+                logger.warning(f"Context string too large ({len(context_string)} chars)! Truncating to {max_context_chars}.")
+                context_string = context_string[:max_context_chars]
 
-            logger.debug(f"Retrieved {len(final_chunks[:2])} chunks. String length: {len(context_string)}")
+            logger.debug(f"Retrieved {len(final_chunks[:2])} chunks. Final String length: {len(context_string)}")
 
         except Exception as e:
             logger.error(f"Error during retrieval: {e}")
