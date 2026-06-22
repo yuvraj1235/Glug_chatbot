@@ -178,15 +178,20 @@ class LLMService:
         try:
             model_name = settings.DEFAULT_MODEL
             if "gemini" in model_name.lower():
-                model_name = "llama-3.1-8b-instant"
-                logger.warning(f"Gemini model detected. Swapping to: {model_name}")
-
-            self.llm = ChatGroq(
-                api_key=settings.GROQ_API_KEY,
-                model=model_name,
-                temperature=0.3,
-                max_tokens=512
-            )
+                from langchain_google_genai import ChatGoogleGenerativeAI
+                self.llm = ChatGoogleGenerativeAI(
+                    model=model_name,
+                    google_api_key=settings.GEMINI_API_KEY,
+                    temperature=0.3,
+                    max_output_tokens=512
+                )
+            else:
+                self.llm = ChatGroq(
+                    api_key=settings.GROQ_API_KEY,
+                    model=model_name,
+                    temperature=0.3,
+                    max_tokens=512
+                )
             logger.info(f"LLM initialized: {model_name}")
 
         except Exception as e:
