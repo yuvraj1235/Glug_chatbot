@@ -24,5 +24,6 @@ class Settings(BaseSettings):
     HUGGINGFACEHUB_API_TOKEN: str | None = None
     HF_MODEL_REPO: str | None = None
     GEMINI_API_KEY: str | None = None
+    COHERE_API_KEY: str | None = None
 
 settings = Settings()

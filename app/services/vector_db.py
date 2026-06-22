@@ -15,7 +15,7 @@ supabase_client: Client = (
 # BGE-large-en-v1.5 = 1024-dim vectors
 # Supabase table must be: embedding vector(1024)
 embeddings = HuggingFaceEndpointEmbeddings(
-    model="BAAI/bge-large-en-v1.5",
+    model="BAAI/bge-base-en-v1.5",
     huggingfacehub_api_token=os.environ.get("HUGGINGFACEHUB_API_TOKEN")
 )
 

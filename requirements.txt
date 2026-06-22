@@ -11,8 +11,12 @@ supabase
 # --- Core LangChain ---
 langchain>=0.3.0
 langchain-community>=0.3.0
+langchain-text-splitters>=0.3.0
 
 # --- Partner Ecosystems ---
 langchain-google-genai>=1.0.0
 langchain-huggingface>=0.1.0
 langchain-groq>=0.2.0
+
+# --- Local Reranking ---
+flashrank>=0.2.8
