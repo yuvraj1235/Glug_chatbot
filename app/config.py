@@ -25,5 +25,6 @@ class Settings(BaseSettings):
     HF_MODEL_REPO: str | None = None
     GEMINI_API_KEY: str | None = None
     COHERE_API_KEY: str | None = None
+    USE_RERANKER: bool = True
 
 settings = Settings()

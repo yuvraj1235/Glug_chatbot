@@ -150,23 +150,27 @@ class LLMService:
                 search_kwargs={"k": 20}
             )
 
-            # ✅ Reranker called directly in generate_response
-            if settings.COHERE_API_KEY:
-                logger.info("Initializing CohereReranker...")
-                self.compressor = CohereReranker(
-                    api_token=settings.COHERE_API_KEY,
-                    model_name="rerank-v3.5",
-                    top_n=4
-                )
+            # ✅ Reranker called directly in generate_response if enabled
+            if settings.USE_RERANKER:
+                if settings.COHERE_API_KEY:
+                    logger.info("Initializing CohereReranker...")
+                    self.compressor = CohereReranker(
+                        api_token=settings.COHERE_API_KEY,
+                        model_name="rerank-v3.5",
+                        top_n=4
+                    )
+                else:
+                    logger.info("Initializing HFServerlessReranker...")
+                    self.compressor = HFServerlessReranker(
+                        api_token=settings.HUGGINGFACEHUB_API_TOKEN,
+                        model_name="BAAI/bge-reranker-base",
+                        top_n=4
+                    )
+                logger.info("DB, Retriever and Reranker initialized successfully")
             else:
-                logger.info("Initializing HFServerlessReranker...")
-                self.compressor = HFServerlessReranker(
-                    api_token=settings.HUGGINGFACEHUB_API_TOKEN,
-                    model_name="BAAI/bge-reranker-base",
-                    top_n=4
-                )
-
-            logger.info("DB, Retriever and Reranker initialized successfully")
+                logger.info("Reranker is disabled by configuration.")
+                self.compressor = None
+                logger.info("DB and Retriever initialized successfully")
 
         except Exception as e:
             logger.error(f"Error connecting to DB/Retriever: {e}")
