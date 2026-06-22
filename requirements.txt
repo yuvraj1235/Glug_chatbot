@@ -2,13 +2,19 @@ fastapi>=0.110.0
 uvicorn>=0.28.0
 pydantic>=2.6.0
 pydantic-settings>=2.2.0
-google-genai>=0.1.0
 python-dotenv>=1.0.1
 httpx               
 beautifulsoup4      
-langchain           
+
+# Core LangChain Layer
+langchain>=0.2.0
 langchain-community 
-langchain-google-genai>=1.0.0
 langchain-huggingface
-supabase
-langchain-classic
+langchain-groq
+
+# Local Vector Math Processing
+sentence-transformers
+
+# Database Connectors
+supabase>=2.4.0
+postgrest>=0.10.0
