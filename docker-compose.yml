@@ -1,0 +1,12 @@
+services:
+  chatbot:
+    build: .
+    container_name: glug_chatbot_app
+    ports:
+      - "8000:80"
+    env_file:
+      - .env
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    restart: unless-stopped

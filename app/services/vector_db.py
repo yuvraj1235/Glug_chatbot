@@ -1,35 +1,52 @@
 import os
 from supabase.client import Client, create_client
 from langchain_community.vectorstores import SupabaseVectorStore
-# 1. FIXED: Swapped to local CPU execution wrapper to bypass HF cloud limits completely
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 
-# Replace the local disk path with your Supabase Cloud credentials
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY") # Use the service_role key to bypass RLS for inserts
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
 
-# Initialize the official Supabase client
-supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY) if SUPABASE_URL and SUPABASE_SERVICE_KEY else None
-
-# 2. FIXED: Local model execution. This downloads the model weights (~100MB) once 
-# on the first run and runs calculations completely offline. 
-# Matches your 384-dimensional vector database table perfectly!
-embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
+supabase_client: Client = (
+    create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    if SUPABASE_URL and SUPABASE_SERVICE_KEY
+    else None
 )
 
-def store_documents_in_supabase(documents):
+# BGE-large-en-v1.5 = 1024-dim vectors
+# Supabase table must be: embedding vector(1024)
+embeddings = HuggingFaceEndpointEmbeddings(
+    model="BAAI/bge-large-en-v1.5",
+    huggingfacehub_api_token=os.environ.get("HUGGINGFACEHUB_API_TOKEN")
+)
+
+def get_vector_store() -> SupabaseVectorStore | None:
+    """Returns the vector store instance for use in retrieval chains."""
     if not supabase_client:
-        print("Error: Supabase client is not initialized. Check your environment variables.")
+        print("Error: Supabase client not initialized. Check environment variables.")
         return None
-        
-    # Swap Chroma for SupabaseVectorStore
-    vector_store = SupabaseVectorStore.from_documents(
-        documents=documents,
+
+    return SupabaseVectorStore(
         embedding=embeddings,
         client=supabase_client,
-        table_name="documents",           # The 384-dimension table in your database
-        query_name="match_documents",      # The matching RPC function
-        chunk_size=100                     # Comfortable batch size for inserting records into Supabase
+        table_name="documents",
+        query_name="match_documents"
     )
-    return vector_store
+
+def get_retriever(k: int = 5, source_filter: str | None = None):
+    """
+    Returns a LangChain retriever.
+    
+    Args:
+        k: number of chunks to retrieve
+        source_filter: optionally filter by metadata source tag
+                       e.g. "events", "profiles", "alumni"
+    """
+    vector_store = get_vector_store()
+    if not vector_store:
+        return None
+
+    search_kwargs = {"k": k}
+    if source_filter:
+        search_kwargs["filter"] = {"source": source_filter}
+
+    return vector_store.as_retriever(search_kwargs=search_kwargs)
