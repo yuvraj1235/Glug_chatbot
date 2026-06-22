@@ -1,10 +1,13 @@
-# app/enrichment.py
+# app/services/enrichment.py
 import httpx
 import hashlib
 import json
 import os
+import asyncio
+import time
+import logging
 
-HF_SUMMARIZATION_URL = "https://router.huggingface.co/hf-inference/models/facebook/bart-large-cnn"
+logger = logging.getLogger("chatbot")
 
 CACHE_FILE = "hf_enrichment_cache.json"
 
@@ -14,13 +17,71 @@ CACHE_FILE = "hf_enrichment_cache.json"
 
 def load_cache() -> dict:
     if os.path.exists(CACHE_FILE):
-        with open(CACHE_FILE) as f:
-            return json.load(f)
+        try:
+            with open(CACHE_FILE) as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"[Enrichment Cache] Failed to load cache: {e}")
     return {}
 
 def save_cache(cache: dict):
-    with open(CACHE_FILE, "w") as f:
-        json.dump(cache, f, indent=2)
+    try:
+        with open(CACHE_FILE, "w") as f:
+            json.dump(cache, f, indent=2)
+    except Exception as e:
+        logger.error(f"[Enrichment Cache] Failed to save cache: {e}")
+
+# ─────────────────────────────────────────
+# Rate Limiting & Pacing for Groq llama-3.1-8b-instant
+# RPM limit: 30, TPM limit: 6000
+# ─────────────────────────────────────────
+
+_request_history = []
+_history_lock = asyncio.Lock()
+
+def estimate_tokens(text: str) -> int:
+    # Character count based estimation with safety margin
+    # System prompt is ~40 tokens, plus 100 max_tokens for output
+    input_tokens = int(len(text[:2000]) / 3.5) + 40
+    output_tokens = 100
+    return input_tokens + output_tokens
+
+async def pace_rate_limit(estimated_tokens: int):
+    # Safety cap to prevent infinite loops if estimation goes wrong
+    estimated_tokens = min(estimated_tokens, 5000)
+    
+    while True:
+        async with _history_lock:
+            now = time.time()
+            # Clean up entries older than 60 seconds
+            _request_history[:] = [entry for entry in _request_history if now - entry[0] < 60.0]
+            
+            current_requests = len(_request_history)
+            current_tokens = sum(entry[1] for entry in _request_history)
+            
+            # TPM limit target is 5500 to leave a safety buffer below 6000 TPM
+            # RPM limit target is 30 requests per minute
+            if current_requests < 30 and (current_tokens + estimated_tokens) <= 5500:
+                # Safe to proceed! Add the entry inside the lock and exit.
+                _request_history.append((now, estimated_tokens))
+                return
+                
+            # If not safe, find out how long we must sleep.
+            # We must sleep until the oldest request falls out of the window.
+            if not _request_history:
+                return
+                
+            oldest_time = _request_history[0][0]
+            sleep_needed = 60.0 - (now - oldest_time) + 0.1
+            
+        # We release the lock before sleeping so other tasks are not blocked
+        if sleep_needed > 0:
+            logger.info(
+                f"[Enrichment Rate Limit] Approaching limits "
+                f"(Requests: {current_requests}/30, Tokens: {current_tokens}/{5500}, next request needs {estimated_tokens}). "
+                f"Pacing sleep for {sleep_needed:.2f}s..."
+            )
+            await asyncio.sleep(sleep_needed)
 
 # ─────────────────────────────────────────
 # Core summarizer
@@ -28,8 +89,7 @@ def save_cache(cache: dict):
 
 async def enrich_with_hf_summary(
     source: str,
-    raw_text: str,
-    hf_token: str
+    raw_text: str
 ) -> str:
     """
     Calls Llama-3 via Groq API to generate a natural language summary.
@@ -37,8 +97,6 @@ async def enrich_with_hf_summary(
     Falls back to raw_text silently on any failure.
     Includes rate limit retry logic (429 handling) and pacing.
     """
-    import asyncio
-
     # Too short to summarize meaningfully → skip
     if len(raw_text.split("\n")) < 4:
         return f"Source Section: {source}\n\n{raw_text}"
@@ -50,14 +108,15 @@ async def enrich_with_hf_summary(
         groq_key = os.environ.get("GROQ_API_KEY")
 
     if not groq_key:
-        print(f"[Enrichment] Groq API key not found. Skipping summary for source={source}")
+        logger.warning(f"[Enrichment] Groq API key not found. Skipping summary for source={source}")
         return f"Source Section: {source}\n\n{raw_text}"
 
     try:
         async with httpx.AsyncClient() as client:
             for attempt in range(3):
-                # Strict rate-limiting sleep before every request attempt (guarantees < 30 requests per minute)
-                await asyncio.sleep(2.1)
+                # Calculate estimated tokens and pace requests to avoid exceeding 6K TPM / 30 RPM
+                tokens = estimate_tokens(raw_text)
+                await pace_rate_limit(tokens)
 
                 response = await client.post(
                     "https://api.groq.com/openai/v1/chat/completions",
@@ -93,12 +152,17 @@ async def enrich_with_hf_summary(
                         sleep_time = float(retry_after) if retry_after else (5.0 * (attempt + 1))
                     except ValueError:
                         sleep_time = 5.0 * (attempt + 1)
-                    print(f"[Enrichment] Groq returned 429. Retrying in {sleep_time}s... (Attempt {attempt+1}/3)")
+                    logger.warning(f"[Enrichment] Groq returned 429. Retrying in {sleep_time}s... (Attempt {attempt+1}/3)")
+                    
+                    # Add penalty to request history to force safety cooldown
+                    async with _history_lock:
+                        _request_history.append((time.time(), 1000))
+                        
                     await asyncio.sleep(sleep_time)
                     continue
 
                 if response.status_code != 200:
-                    print(f"[Enrichment] Groq failed ({response.status_code}) for source={source}")
+                    logger.error(f"[Enrichment] Groq failed ({response.status_code}) for source={source}")
                     return f"Source Section: {source}\n\n{raw_text}"
 
                 result = response.json()
@@ -114,14 +178,12 @@ async def enrich_with_hf_summary(
                 )
 
             # If all 3 attempts returned 429
-            print(f"[Enrichment] Groq rate limits exceeded. Skipping summary for source={source}")
+            logger.error(f"[Enrichment] Groq rate limits exceeded. Skipping summary for source={source}")
             return f"Source Section: {source}\n\n{raw_text}"
 
     except Exception as e:
-        print(f"[Enrichment] Exception for source={source}: {e}")
+        logger.error(f"[Enrichment] Exception for source={source}: {e}")
         return f"Source Section: {source}\n\n{raw_text}"   # never crash pipeline
-
-
 
 # ─────────────────────────────────────────
 # Cached wrapper
@@ -130,7 +192,6 @@ async def enrich_with_hf_summary(
 async def enrich_cached(
     source: str,
     raw_text: str,
-    hf_token: str,
     cache: dict
 ) -> str:
     key = hashlib.md5(raw_text.encode()).hexdigest()
@@ -138,6 +199,6 @@ async def enrich_cached(
     if key in cache:
         return cache[key]                          # skip API call
 
-    enriched = await enrich_with_hf_summary(source, raw_text, hf_token)
+    enriched = await enrich_with_hf_summary(source, raw_text)
     cache[key] = enriched
     return enriched
