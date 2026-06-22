@@ -15,7 +15,7 @@ supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 # 2. FIXED: Instantiate using HuggingFaceEndpointEmbeddings (384 Dimensions)
 # Note: Ensure your Supabase table schema is configured for vector(384)!
 embeddings = HuggingFaceEndpointEmbeddings(
-    model="sentence-transformers/all-MiniLM-L6-v2",
+    model="BAAI/bge-large-en-v1.5",
     huggingfacehub_api_token=HUGGINGFACEHUB_API_TOKEN
 )
 
