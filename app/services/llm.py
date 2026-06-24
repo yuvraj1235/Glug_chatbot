@@ -265,11 +265,13 @@ class LLMService:
             logger.error(f"[YearMatch] Failed: {e}")
             return []
 
-    async def generate_response(self, message: str) -> str:
+    async def generate_response(self, message: str):
         print("LLM:", self.llm)
         print("DB:",self.db)
         if not self.llm or not self.db:
-            return "System is currently unavailable or disconnected."
+            yield f"data: {json.dumps({'response': 'System is currently unavailable or disconnected.'})}\n\n"
+            yield "data: [DONE]\n\n"
+            return
 
         text = message.lower().strip()
         
@@ -279,7 +281,9 @@ class LLMService:
             cached_response = await self.db.redis_client.get(cache_key)
             if cached_response:
                 logger.info("Returning cached LLM response.")
-                return cached_response
+                yield f"data: {json.dumps({'response': cached_response})}\n\n"
+                yield "data: [DONE]\n\n"
+                return
         except Exception as e:
             logger.error(f"Redis response cache read error: {e}")
 
@@ -367,20 +371,24 @@ class LLMService:
         ]
 
         try:
-            response = await self.llm.ainvoke(messages)
-            content = response.content
+            full_response = ""
+            async for chunk in self.llm.astream(messages):
+                content = chunk.content
+                if content:
+                    full_response += content
+                    yield f"data: {json.dumps({'response': content})}\n\n"
             
             # --- Save to LLM Response Cache ---
             try:
-                # Cache response for 24 hours (86400 seconds)
-                await self.db.redis_client.setex(cache_key, 86400, content)
+                await self.db.redis_client.setex(cache_key, 86400, full_response)
             except Exception as e:
                 logger.error(f"Redis response cache write error: {e}")
                 
-            return content
+            yield "data: [DONE]\n\n"
         except Exception as e:
             logger.error(f"[LLM] Invocation error: {e}")
-            return f"Error connecting to LLM: {e}"
+            yield f"data: {json.dumps({'response': f'Error connecting to LLM: {e}'})}\n\n"
+            yield "data: [DONE]\n\n"
 
     async def refresh_cache(self):
         if hasattr(self.db, "clear_cache"):
