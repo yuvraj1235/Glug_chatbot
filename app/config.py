@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_KEY: str
 
     # 2. Enforce Groq configuration for fast, free cloud text generation
-    GROQ_API_KEY: str
+    GROQ_API_KEY: str | None = None
     DEFAULT_MODEL: str = "llama-3.1-8b-instant"
 
     # 3. Make legacy cloud tokens optional so existing setups don't break
@@ -26,5 +26,8 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str | None = None
     COHERE_API_KEY: str | None = None
     USE_RERANKER: bool = True
+    
+    # 4. Redis configuration
+    REDIS_URL: str = "redis://localhost:6379/0"
 
 settings = Settings()

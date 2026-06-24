@@ -12,53 +12,63 @@ from app.services.reranker import HFServerlessReranker, CohereReranker
 
 logger = logging.getLogger("chatbot")
 
-# In-memory document cache to optimize search performance
-_cached_documents = []
-_cache_lock = asyncio.Lock()
+import json
+import redis.asyncio as redis
 
 class LocalSupabaseVectorStore:
     def __init__(self, client: Client, embeddings, table_name="documents"):
         self.client = client
         self.embeddings = embeddings
         self.table_name = table_name
+        self.redis_client = redis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
+        self.cache_key = "vector_store_documents"
 
     async def _get_all_documents(self) -> list:
-        global _cached_documents
-        async with _cache_lock:
-            if _cached_documents:
-                return _cached_documents
+        try:
+            cached_data = await self.redis_client.get(self.cache_key)
+            if cached_data:
+                return json.loads(cached_data)
+        except Exception as e:
+            logger.error(f"Redis cache read error: {e}")
+
+        try:
+            logger.info("Loading documents into Redis cache from Supabase...")
+            res = self.client.table(self.table_name).select("id, content, metadata, embedding").execute()
+            docs = []
+            for item in res.data:
+                emb_str = item.get("embedding")
+                if isinstance(emb_str, str):
+                    emb_str = emb_str.strip().lstrip("[").rstrip("]")
+                    emb = [float(x) for x in emb_str.split(",") if x.strip()]
+                elif isinstance(emb_str, list):
+                    emb = [float(x) for x in emb_str]
+                else:
+                    emb = []
+                
+                docs.append({
+                    "id": item.get("id"),
+                    "content": item.get("content"),
+                    "metadata": item.get("metadata") or {},
+                    "embedding": emb
+                })
             
             try:
-                logger.info("Loading documents into memory cache from Supabase...")
-                res = self.client.table(self.table_name).select("id, content, metadata, embedding").execute()
-                docs = []
-                for item in res.data:
-                    emb_str = item.get("embedding")
-                    if isinstance(emb_str, str):
-                        emb_str = emb_str.strip().lstrip("[").rstrip("]")
-                        emb = [float(x) for x in emb_str.split(",") if x.strip()]
-                    elif isinstance(emb_str, list):
-                        emb = [float(x) for x in emb_str]
-                    else:
-                        emb = []
-                    
-                    docs.append({
-                        "id": item.get("id"),
-                        "content": item.get("content"),
-                        "metadata": item.get("metadata") or {},
-                        "embedding": emb
-                    })
-                _cached_documents = docs
-                logger.info(f"Loaded {len(_cached_documents)} documents into memory cache successfully.")
+                await self.redis_client.set(self.cache_key, json.dumps(docs))
+                logger.info(f"Loaded {len(docs)} documents into Redis cache successfully.")
             except Exception as e:
-                logger.error(f"Failed to load documents from database: {e}")
-            
-            return _cached_documents
+                logger.error(f"Redis cache write error: {e}")
+                
+            return docs
+        except Exception as e:
+            logger.error(f"Failed to load documents from database: {e}")
+            return []
 
-    def clear_cache(self):
-        global _cached_documents
-        _cached_documents = []
-        logger.info("In-memory document cache cleared.")
+    async def clear_cache(self):
+        try:
+            await self.redis_client.delete(self.cache_key)
+            logger.info("Redis document cache cleared.")
+        except Exception as e:
+            logger.error(f"Failed to clear Redis document cache: {e}")
 
     async def asimilarity_search(self, query: str, k: int = 5, filter: dict = None) -> list[Document]:
         docs = await self._get_all_documents()
@@ -256,10 +266,23 @@ class LLMService:
             return []
 
     async def generate_response(self, message: str) -> str:
+        print("LLM:", self.llm)
+        print("DB:",self.db)
         if not self.llm or not self.db:
             return "System is currently unavailable or disconnected."
 
         text = message.lower().strip()
+        
+        # --- LLM Response Caching ---
+        cache_key = f"llm_response:{text}"
+        try:
+            cached_response = await self.db.redis_client.get(cache_key)
+            if cached_response:
+                logger.info("Returning cached LLM response.")
+                return cached_response
+        except Exception as e:
+            logger.error(f"Redis response cache read error: {e}")
+
         context_string = ""
 
         try:
@@ -345,14 +368,23 @@ class LLMService:
 
         try:
             response = await self.llm.ainvoke(messages)
-            return response.content
+            content = response.content
+            
+            # --- Save to LLM Response Cache ---
+            try:
+                # Cache response for 24 hours (86400 seconds)
+                await self.db.redis_client.setex(cache_key, 86400, content)
+            except Exception as e:
+                logger.error(f"Redis response cache write error: {e}")
+                
+            return content
         except Exception as e:
             logger.error(f"[LLM] Invocation error: {e}")
             return f"Error connecting to LLM: {e}"
 
-    def refresh_cache(self):
+    async def refresh_cache(self):
         if hasattr(self.db, "clear_cache"):
-            self.db.clear_cache()
+            await self.db.clear_cache()
 
 
 
