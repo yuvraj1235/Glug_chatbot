@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import uuid
+from datetime import datetime
 from bs4 import BeautifulSoup
 from langchain_core.documents import Document
 from langchain_community.vectorstores import SupabaseVectorStore
@@ -27,35 +28,17 @@ embeddings = HuggingFaceEndpointEmbeddings(
 )
 
 API_ENDPOINTS = {
-    "events":           "https://api.nitdgplug.org/api/events/",
-    "upcoming-events":  "https://api.nitdgplug.org/api/upcoming-events/",
     "profiles":         "https://api.nitdgplug.org/api/profiles/",
     "about":            "https://api.nitdgplug.org/api/about/",
     "project":          "https://api.nitdgplug.org/api/project/",
     "contact":          "https://api.nitdgplug.org/api/contact/",
-    "activity":         "https://api.nitdgplug.org/api/activity/",
-    "carousel":         "https://api.nitdgplug.org/api/carousel/",
     "linit":            "https://api.nitdgplug.org/api/linit/",
-    "timeline":         "https://api.nitdgplug.org/api/timeline/",
     "timeline_monthly": "https://api.nitdgplug.org/api/timeline_monthly/",
     "alumni":           "https://api.nitdgplug.org/api/alumni/",
     "facads":           "https://api.nitdgplug.org/api/facads/",
-    "alumni-by-year":   "https://api.nitdgplug.org/api/alumni-by-year/",
-    "techbytes":        "https://api.nitdgplug.org/api/techbytes/",
-    "devposts":         "https://api.nitdgplug.org/api/devposts/",
-    "configs":          "https://api.nitdgplug.org/api/configs/",
-    "ctf":              "https://api.nitdgplug.org/api/ctf/"
+    "events":           "https://api.nitdgplug.org/api/events/"
 }
 
-SOURCE_GROUP = {
-    "upcoming-events":  "events",
-    "activity":         "events",
-    "carousel":         "events",
-    "timeline":         "events",
-    "timeline_monthly": "events",
-    "alumni-by-year":   "alumni",
-    "facads":           "profiles",
-}
 
 BLOCKED_KEY_RE = re.compile(
     r'image|photo|avatar|logo|icon|thumbnail|banner|picture|pic|img|media',
@@ -131,7 +114,8 @@ async def scrape_all_endpoints() -> dict:
     # Collectors to keep names/roles for aggregate roster summaries
     roster_collectors = {
         "profiles": [],
-        "alumni": []
+        "alumni": [],
+        "facads": []
     }
 
     async with httpx.AsyncClient() as client:
@@ -143,10 +127,25 @@ async def scrape_all_endpoints() -> dict:
                     continue
 
                 items = response.json()
-                if isinstance(items, dict):
+                if source_name == "timeline_monthly" and isinstance(items, dict):
+                    def _parse_month(k):
+                        try:
+                            return datetime.strptime(k.strip(), "%B %Y")
+                        except ValueError:
+                            return datetime.min
+                    sorted_months = sorted(items.keys(), key=_parse_month, reverse=True)[:3]
+                    extracted_events = []
+                    for m in sorted_months:
+                        month_events = items.get(m, [])
+                        if isinstance(month_events, list):
+                            for ev in month_events:
+                                if isinstance(ev, dict):
+                                    extracted_events.append({"month": m, **ev})
+                    items = extracted_events
+                elif isinstance(items, dict):
                     items = [items]
 
-                clean_source = SOURCE_GROUP.get(source_name, source_name)
+                clean_source = source_name
 
                 source_docs_count = 0
                 for item in items:
