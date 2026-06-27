@@ -1,5 +1,4 @@
 # app/services/enrichment.py
-#cfbr
 import httpx
 import hashlib
 import json
@@ -42,40 +41,32 @@ _history_lock = asyncio.Lock()
 
 def estimate_tokens(text: str) -> int:
     # Character count based estimation with safety margin
-    # System prompt is ~40 tokens, plus 100 max_tokens for output
-    input_tokens = int(len(text[:2000]) / 3.5) + 40
-    output_tokens = 100
+    # System prompt is ~150 tokens, plus 300 max_tokens for prose output
+    input_tokens = int(len(text[:2500]) / 3.5) + 150
+    output_tokens = 300
     return input_tokens + output_tokens
 
 async def pace_rate_limit(estimated_tokens: int):
-    # Safety cap to prevent infinite loops if estimation goes wrong
     estimated_tokens = min(estimated_tokens, 5000)
     
     while True:
         async with _history_lock:
             now = time.time()
-            # Clean up entries older than 60 seconds
             _request_history[:] = [entry for entry in _request_history if now - entry[0] < 60.0]
             
             current_requests = len(_request_history)
             current_tokens = sum(entry[1] for entry in _request_history)
             
-            # TPM limit target is 5500 to leave a safety buffer below 6000 TPM
-            # RPM limit target is 30 requests per minute
             if current_requests < 30 and (current_tokens + estimated_tokens) <= 5500:
-                # Safe to proceed! Add the entry inside the lock and exit.
                 _request_history.append((now, estimated_tokens))
                 return
                 
-            # If not safe, find out how long we must sleep.
-            # We must sleep until the oldest request falls out of the window.
             if not _request_history:
                 return
                 
             oldest_time = _request_history[0][0]
             sleep_needed = 60.0 - (now - oldest_time) + 0.1
             
-        # We release the lock before sleeping so other tasks are not blocked
         if sleep_needed > 0:
             logger.info(
                 f"[Enrichment Rate Limit] Approaching limits "
@@ -85,7 +76,7 @@ async def pace_rate_limit(estimated_tokens: int):
             await asyncio.sleep(sleep_needed)
 
 # ─────────────────────────────────────────
-# Core summarizer
+# Core Prose Transformer
 # ─────────────────────────────────────────
 
 async def enrich_with_hf_summary(
@@ -93,15 +84,10 @@ async def enrich_with_hf_summary(
     raw_text: str
 ) -> str:
     """
-    Calls Llama-3 via Groq API to generate a natural language summary.
-    Prepends summary + source tag to raw chunk.
-    Falls back to raw_text silently on any failure.
-    Includes rate limit retry logic (429 handling) and pacing.
+    Transforms raw API dumps into clean, uniform natural language paragraphs (prose)
+    using Groq Llama-3 to eliminate technical syntax boilerplate, optimizing embeddings 
+    and conserving runtime context window space.
     """
-    # Too short to summarize meaningfully → skip
-    if len(raw_text.split("\n")) < 4:
-        return f"Source Section: {source}\n\n{raw_text}"
-
     try:
         from app.config import settings
         groq_key = settings.GROQ_API_KEY
@@ -109,13 +95,39 @@ async def enrich_with_hf_summary(
         groq_key = os.environ.get("GROQ_API_KEY")
 
     if not groq_key:
-        logger.warning(f"[Enrichment] Groq API key not found. Skipping summary for source={source}")
+        logger.warning(f"[Enrichment] Groq API key not found. Skipping transformation for source={source}")
         return f"Source Section: {source}\n\n{raw_text}"
+
+    # Construct source-specific descriptive instruction contexts
+    if source == "profiles":
+        style_instruction = (
+            "Convert the raw profile keys and fields into a highly cohesive biographical paragraph. "
+            "Write in the third-person active voice. Highlight their full name, role (if visible), graduation or batch year, degree, and specific social profile handles (GitHub, LinkedIn, Facebook). "
+            "Example: 'GLUG Member Profile: Debmalya Das is a BTECH student with username Debmalya_007. Their contact email is dasdebmalya03@gmail.com. They are active on GitHub at github.com/DebmalyaDas-007 and LinkedIn.'"
+        )
+    elif source == "events":
+        style_instruction = (
+            "Convert the raw event fields into an engaging, descriptive paragraph summarizing the technical event. "
+            "Incorporate the title, key description facts, core technical domains (like cybersecurity or webdev), exact timelines/dates, prize tracks, and registration URLs. "
+            "Example: 'GLUG Event: Mini-CTF is a beginner-friendly Capture the Flag competition focusing on cybersecurity and ethical hacking. Held from March 1st to March 2nd, 2023, it featured a prize pool of 1700+ INR and goodies. Official resources can be accessed at minictf.nitdgplug.org.'"
+        )
+    else:
+        style_instruction = (
+            "Convert the raw data data fields into clear, natural language prose. Eliminate brackets, trailing braces, structural punctuation, and database table metadata keys."
+        )
+
+    system_prompt = (
+        "You are an expert data-transformation engineer. "
+        f"Your task is to rewrite raw technical text into clean, high-density natural language prose.\n"
+        f"CRITICAL RULES:\n"
+        f"1. Follow this style: {style_instruction}\n"
+        f"2. Output ONLY the resulting paragraph. No conversational preambles, introductory lines, or markdown annotations.\n"
+        f"3. Retain every unique personal handle, URL link, date, name, and metric asset precisely. Do not drop links or specific names."
+    )
 
     try:
         async with httpx.AsyncClient() as client:
             for attempt in range(3):
-                # Calculate estimated tokens and pace requests to avoid exceeding 6K TPM / 30 RPM
                 tokens = estimate_tokens(raw_text)
                 await pace_rate_limit(tokens)
 
@@ -128,23 +140,13 @@ async def enrich_with_hf_summary(
                     json={
                         "model": "llama-3.1-8b-instant",
                         "messages": [
-                            {
-                                "role": "system",
-                                "content": (
-                                    "You are a precise summarization assistant. "
-                                    "Summarize the given text in a single, short sentence. "
-                                    "Do not include any conversational filler, introductory phrases (like 'Here is a summary:'), or prefix/suffix."
-                                )
-                            },
-                            {
-                                "role": "user",
-                                "content": f"Text to summarize:\n{raw_text[:2000]}"
-                            }
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": f"Raw text data payload to transform:\n{raw_text[:2500]}"}
                         ],
-                        "temperature": 0.0,
-                        "max_tokens": 100
+                        "temperature": 0.1,
+                        "max_tokens": 300
                     },
-                    timeout=15.0
+                    timeout=20.0
                 )
 
                 if response.status_code == 429:
@@ -153,9 +155,8 @@ async def enrich_with_hf_summary(
                         sleep_time = float(retry_after) if retry_after else (5.0 * (attempt + 1))
                     except ValueError:
                         sleep_time = 5.0 * (attempt + 1)
-                    logger.warning(f"[Enrichment] Groq returned 429. Retrying in {sleep_time}s... (Attempt {attempt+1}/3)")
+                    logger.warning(f"[Enrichment] Groq 429. Retrying in {sleep_time}s...")
                     
-                    # Add penalty to request history to force safety cooldown
                     async with _history_lock:
                         _request_history.append((time.time(), 1000))
                         
@@ -167,24 +168,17 @@ async def enrich_with_hf_summary(
                     return f"Source Section: {source}\n\n{raw_text}"
 
                 result = response.json()
-                summary = result["choices"][0]["message"]["content"].strip()
-                # Clean any accidental conversational prefixes
-                if summary.lower().startswith("here is a summary:"):
-                    summary = summary[18:].strip()
+                transformed_prose = result["choices"][0]["message"]["content"].strip()
+                
+                # Prepend precise tag headers for clear identification by downstream query routers
+                return f"Source Section: {source}\n\n{transformed_prose}"
 
-                return (
-                    f"Summary: {summary}\n"
-                    f"Source Section: {source}\n\n"
-                    f"{raw_text}"
-                )
-
-            # If all 3 attempts returned 429
-            logger.error(f"[Enrichment] Groq rate limits exceeded. Skipping summary for source={source}")
+            logger.error(f"[Enrichment] Rate limits completely exhausted. Skipping source={source}")
             return f"Source Section: {source}\n\n{raw_text}"
 
     except Exception as e:
         logger.error(f"[Enrichment] Exception for source={source}: {e}")
-        return f"Source Section: {source}\n\n{raw_text}"   # never crash pipeline
+        return f"Source Section: {source}\n\n{raw_text}"
 
 # ─────────────────────────────────────────
 # Cached wrapper
@@ -198,7 +192,7 @@ async def enrich_cached(
     key = hashlib.md5(raw_text.encode()).hexdigest()
 
     if key in cache:
-        return cache[key]                          # skip API call
+        return cache[key]
 
     enriched = await enrich_with_hf_summary(source, raw_text)
     cache[key] = enriched

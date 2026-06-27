@@ -1,9 +1,10 @@
-# scraper.py
+# app/services/api_scraper.py
 import re
 import httpx
 import hashlib
 import json
 import os
+import uuid
 from bs4 import BeautifulSoup
 from langchain_core.documents import Document
 from langchain_community.vectorstores import SupabaseVectorStore
@@ -118,15 +119,20 @@ def flatten_item(data: dict) -> str:
     return "\n".join(parts)
 
 
-
 # ─────────────────────────────────────────
-# Main scraper (enrichment wired in)
+# Main scraper (with aggregate roster building)
 # ─────────────────────────────────────────
 
 async def scrape_all_endpoints() -> dict:
     all_documents = []
     summary_results = {}
-    cache = load_cache()                              # ✅ load cache at start
+    cache = load_cache()
+
+    # Collectors to keep names/roles for aggregate roster summaries
+    roster_collectors = {
+        "profiles": [],
+        "alumni": []
+    }
 
     async with httpx.AsyncClient() as client:
         for source_name, url in API_ENDPOINTS.items():
@@ -147,11 +153,21 @@ async def scrape_all_endpoints() -> dict:
                     if not isinstance(item, dict):
                         continue
 
+                    # Capture name profiles for structural counting before flattening strings
+                    if clean_source in roster_collectors:
+                        first_name = item.get("first_name", "").strip()
+                        last_name = item.get("last_name", "").strip()
+                        role = item.get("role", "").strip()
+                        
+                        if first_name or last_name:
+                            full_name = f"{first_name} {last_name}".strip()
+                            display_str = f"{full_name} ({role})" if role else full_name
+                            roster_collectors[clean_source].append(display_str)
+
                     text = flatten_item(item)
                     if not text.strip():
                         continue
 
-                    # ✅ Only addition — enrich before storing
                     text = await enrich_cached(clean_source, text, cache)
 
                     doc = Document(
@@ -170,7 +186,40 @@ async def scrape_all_endpoints() -> dict:
             except Exception as e:
                 summary_results[source_name] = f"Failed: {str(e)}"
 
-    save_cache(cache)                                 # ✅ persist cache after all done
+    save_cache(cache)
+
+    # ─────────────────────────────────────────
+    # Generate Master Summary Roster Chunks
+    # ─────────────────────────────────────────
+    for target_source, names_list in roster_collectors.items():
+        if names_list:
+            unique_names = sorted(list(set(names_list)))
+            total_count = len(unique_names)
+            
+            summary_text = (
+                f"Source Section: {target_source}\n\n"
+                f"GLUG Official Complete {target_source.capitalize()} Summary. "
+                f"Total registered count database-wide: {total_count}. "
+                f"The exact list of all entry names includes: {', '.join(unique_names)}."
+            )
+            
+            # Generate deterministic namespace UUID string based on source name
+            # This ensures we overwrite previous master chunks instead of appending endlessly
+            master_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"glug.chatbot.master.{target_source}"))
+            
+            master_doc = Document(
+                page_content=summary_text,
+                metadata={
+                    "id": master_uuid,
+                    "source": target_source,
+                    "type": "summary",
+                    "is_master": True,
+                    "endpoint": "aggregated_summary",
+                    "url": "internal://summary"
+                }
+            )
+            all_documents.append(master_doc)
+            summary_results[f"master_{target_source}_summary"] = f"Generated complete master roster summary with {total_count} records"
 
     if all_documents:
         await SupabaseVectorStore.afrom_documents(

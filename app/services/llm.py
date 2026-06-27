@@ -167,14 +167,14 @@ class LLMService:
                     self.compressor = CohereReranker(
                         api_token=settings.COHERE_API_KEY,
                         model_name="rerank-v3.5",
-                        top_n=4
+                        top_n=80
                     )
                 else:
                     logger.info("Initializing HFServerlessReranker...")
                     self.compressor = HFServerlessReranker(
                         api_token=settings.HUGGINGFACEHUB_API_TOKEN,
                         model_name="BAAI/bge-reranker-base",
-                        top_n=4
+                        top_n=80
                     )
                 logger.info("DB, Retriever and Reranker initialized successfully")
             else:
@@ -199,7 +199,7 @@ class LLMService:
                 api_key=settings.GROQ_API_KEY,
                 model=model_name,
                 temperature=0.3,
-                max_tokens=512
+                max_tokens=1500
             )
             logger.info(f"LLM initialized: {model_name}")
 
@@ -245,7 +245,7 @@ class LLMService:
         message: str,
         years: list[str],
         search_filter: dict,
-        limit: int = 3
+        limit: int = 80
     ) -> list[str]:
         try:
             broad_docs = await self.db.asimilarity_search(
@@ -308,7 +308,7 @@ class LLMService:
             try:
                 # Update filter per query
                 self.base_retriever.search_kwargs = {
-                    "k": 20,
+                    "k": 80,
                     "filter": search_filter if search_filter else None
                 }
 
@@ -322,14 +322,14 @@ class LLMService:
                     reranked_docs = [doc.page_content for doc in reranked]
                     logger.debug(f"[Reranker] Returned {len(reranked_docs)} docs")
                 else:
-                    reranked_docs = [doc.page_content for doc in retrieved[:4]]
+                    reranked_docs = [doc.page_content for doc in retrieved[:80]]
 
             except Exception as e:
                 # Fallback to plain vector search
                 logger.warning(f"[Retrieval] Failed, using fallback: {e}")
                 fallback = await self.db.asimilarity_search(
                     message,
-                    k=5,
+                    k=80,
                     filter=search_filter if search_filter else None
                 )
                 reranked_docs = [doc.page_content for doc in fallback]
@@ -342,23 +342,43 @@ class LLMService:
                     seen.add(chunk)
                     final_chunks.append(chunk)
 
-            # Step 5 — Build context, cap at 8000 chars
-            context_string = "\n\n---\n\n".join(final_chunks[:5])
-            if len(context_string) > 8000:
-                context_string = context_string[:8000]
+            # Step 5 — Build context by stacking whole chunks up to the character limit
+            if final_chunks:
+                processed_chunks = []
+                current_length = 0
+                max_total_chars = 10000  # Groq Llama-3.1-8b easily handles 15k+ chars of context
 
-            logger.debug(f"[Context] {len(final_chunks[:5])} chunks, {len(context_string)} chars")
+                for chunk in final_chunks:
+                    # Estimate the length this chunk will add (including dividers)
+                    added_length = len(chunk) + 5
+                    
+                    if current_length + added_length <= max_total_chars:
+                        processed_chunks.append(chunk)
+                        current_length += added_length
+                    else:
+                        # Stop adding once the budget is full to keep remaining chunks intact
+                        logger.warning(f"[Context] Context limit reached. Omitted {len(final_chunks) - len(processed_chunks)} chunks.")
+                        break
+                        
+                context_string = "\n\n---\n\n".join(processed_chunks)
+            else:
+                context_string = ""
+            
+            logger.debug(f"[Context] {len(final_chunks)} chunks, {len(context_string)} chars")
 
         except Exception as e:
             logger.error(f"[Retrieval] Error: {e}")
 
         # Step 6 — LLM
         system_instruction = (
-            "You are the official GLUG Chatbot of NIT Durgapur. "
+            "You are the official chatbot of GLUG (GNU/Linux Users' Group), a technical club at NIT Durgapur. "
+            "Never refer to the club simply as 'NIT Durgapur'; it is 'GLUG'. "
             "Answer the user's question directly using ONLY the provided context below. "
-            "If the context contains profiles with names and years, safely assume they "
-            "correspond to the members or alumni being asked about. "
-            "List their names clearly. "
+            "If the context contains profiles with names, years, and roles, assume they "
+            "are the members or alumni of GLUG being asked about. "
+            "IMPORTANT: Count them accurately. Do NOT estimate. State the exact count based on the provided context, "
+            "and then list ALL of their names clearly. Do not truncate or limit the list to a few examples; list EVERY person found in the context. "
+            "Read through all the provided context carefully to provide a comprehensive answer. "
             "If you truly cannot find the answer in the context, say: "
             "'I don't have that information right now.'"
         )
@@ -371,12 +391,12 @@ class LLMService:
         ]
 
         try:
-            full_response = ""
-            async for chunk in self.llm.astream(messages):
-                content = chunk.content
-                if content:
-                    full_response += content
-                    yield f"data: {json.dumps({'response': content})}\n\n"
+            # Calculate the full response in the background
+            response = await self.llm.ainvoke(messages)
+            full_response = response.content
+            
+            # Yield as a single well-built paragraph
+            yield f"data: {json.dumps({'response': full_response})}\n\n"
             
             # --- Save to LLM Response Cache ---
             try:
