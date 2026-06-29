@@ -14,7 +14,7 @@ async def run_csv_ingest_task(content: bytes, source_label: str, filename: str):
     global CSV_INGEST_IN_PROGRESS
     try:
         logger.info(f"CSV ingest started: file='{filename}', source='{source_label}'")
-        docs = parse_csv_to_documents(content, source_label, filename)
+        docs = await parse_csv_to_documents(content, source_label, filename)
         logger.info(f"Parsed {len(docs)} rows from '{filename}'")
 
         result = await upload_documents_to_vectordb(docs)
