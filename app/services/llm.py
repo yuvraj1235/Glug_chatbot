@@ -164,6 +164,7 @@ class LLMService:
             yield "data: [DONE]\n\n"
             return
 
+        text = message.lower().strip()
         # Normalize text for smarter caching (removes punctuation and extra spaces)
         import string
         normalized_text = text.translate(str.maketrans('', '', string.punctuation))
