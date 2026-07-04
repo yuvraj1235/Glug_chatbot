@@ -103,26 +103,28 @@ async def enrich_with_hf_summary(
         style_instruction = (
             "Convert the raw profile keys and fields into a highly cohesive biographical paragraph. "
             "Write in the third-person active voice. Highlight their full name, role (if visible), graduation or batch year, degree, and specific social profile handles (GitHub, LinkedIn, Facebook). "
-            "Example: 'GLUG Member Profile: Debmalya Das is a BTECH student with username Debmalya_007. Their contact email is dasdebmalya03@gmail.com. They are active on GitHub at github.com/DebmalyaDas-007 and LinkedIn.'"
+            "Also, extract any technical skills, tools, or languages mentioned and list them. "
+            "Example paragraph: 'Debmalya Das is a BTECH student...'"
         )
     elif source == "events":
         style_instruction = (
             "Convert the raw event fields into an engaging, descriptive paragraph summarizing the technical event. "
-            "Incorporate the title, key description facts, core technical domains (like cybersecurity or webdev), exact timelines/dates, prize tracks, and registration URLs. "
-            "Example: 'GLUG Event: Mini-CTF is a beginner-friendly Capture the Flag competition focusing on cybersecurity and ethical hacking. Held from March 1st to March 2nd, 2023, it featured a prize pool of 1700+ INR and goodies. Official resources can be accessed at minictf.nitdgplug.org.'"
+            "Incorporate the title, key description facts, core technical domains, exact timelines/dates, prize tracks, and registration URLs. "
+            "Also, extract the core technical domains/skills this event is related to."
         )
     else:
         style_instruction = (
-            "Convert the raw data data fields into clear, natural language prose. Eliminate brackets, trailing braces, structural punctuation, and database table metadata keys."
+            "Convert the raw data data fields into clear, natural language prose. Eliminate brackets, trailing braces, structural punctuation, and database table metadata keys. "
+            "If any technical skills or domains are mentioned, note them."
         )
 
     system_prompt = (
         "You are an expert data-transformation engineer. "
-        f"Your task is to rewrite raw technical text into clean, high-density natural language prose.\n"
+        f"Your task is to rewrite raw technical text into clean, high-density natural language prose, AND extract skills.\n"
         f"CRITICAL RULES:\n"
         f"1. Follow this style: {style_instruction}\n"
-        f"2. Output ONLY the resulting paragraph. No conversational preambles, introductory lines, or markdown annotations.\n"
-        f"3. Retain every unique personal handle, URL link, date, name, and metric asset precisely. Do not drop links or specific names."
+        f"2. Output ONLY a valid JSON object with exactly two keys: 'prose' (string) and 'skills' (list of strings). No conversational preambles, introductory lines, or markdown annotations.\n"
+        f"3. Retain every unique personal handle, URL link, date, name, and metric asset precisely in the 'prose'. Do not drop links or specific names."
     )
 
     try:
@@ -144,7 +146,8 @@ async def enrich_with_hf_summary(
                             {"role": "user", "content": f"Raw text data payload to transform:\n{raw_text[:2500]}"}
                         ],
                         "temperature": 0.1,
-                        "max_tokens": 300
+                        "max_tokens": 500,
+                        "response_format": {"type": "json_object"}
                     },
                     timeout=20.0
                 )
@@ -168,17 +171,32 @@ async def enrich_with_hf_summary(
                     return f"Source Section: {source}\n\n{raw_text}"
 
                 result = response.json()
-                transformed_prose = result["choices"][0]["message"]["content"].strip()
-                
-                # Prepend precise tag headers for clear identification by downstream query routers
-                return f"Source Section: {source}\n\n{transformed_prose}"
+                try:
+                    parsed_response = json.loads(result["choices"][0]["message"]["content"].strip())
+                    transformed_prose = parsed_response.get("prose", "")
+                    skills_list = parsed_response.get("skills", [])
+                    
+                    # Store as JSON string so callers can extract it, or we format it.
+                    # We will return the JSON string so that callers (like api_scraper) can parse and use skills.
+                    return json.dumps({
+                        "source": source,
+                        "prose": transformed_prose,
+                        "skills": skills_list
+                    })
+                except json.JSONDecodeError:
+                    logger.error("[Enrichment] Failed to parse JSON response from LLM")
+                    return json.dumps({
+                        "source": source, 
+                        "prose": f"Source Section: {source}\n\n{result['choices'][0]['message']['content'].strip()}",
+                        "skills": []
+                    })
 
             logger.error(f"[Enrichment] Rate limits completely exhausted. Skipping source={source}")
-            return f"Source Section: {source}\n\n{raw_text}"
+            return json.dumps({"source": source, "prose": f"Source Section: {source}\n\n{raw_text}", "skills": []})
 
     except Exception as e:
         logger.error(f"[Enrichment] Exception for source={source}: {e}")
-        return f"Source Section: {source}\n\n{raw_text}"
+        return json.dumps({"source": source, "prose": f"Source Section: {source}\n\n{raw_text}", "skills": []})
 
 # ─────────────────────────────────────────
 # Cached wrapper

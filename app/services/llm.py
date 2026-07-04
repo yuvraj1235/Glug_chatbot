@@ -7,6 +7,7 @@ from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_community.vectorstores import SupabaseVectorStore
 from app.config import settings
 from app.services.reranker import HFServerlessReranker, CohereReranker
 
@@ -15,129 +16,15 @@ logger = logging.getLogger("chatbot")
 import json
 import redis.asyncio as redis
 
-class LocalSupabaseVectorStore:
-    def __init__(self, client: Client, embeddings, table_name="documents"):
-        self.client = client
-        self.embeddings = embeddings
-        self.table_name = table_name
-        self.redis_client = redis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
-        self.cache_key = "vector_store_documents"
-
-    async def _get_all_documents(self) -> list:
-        try:
-            cached_data = await self.redis_client.get(self.cache_key)
-            if cached_data:
-                return json.loads(cached_data)
-        except Exception as e:
-            logger.error(f"Redis cache read error: {e}")
-
-        try:
-            logger.info("Loading documents into Redis cache from Supabase...")
-            res = self.client.table(self.table_name).select("id, content, metadata, embedding").execute()
-            docs = []
-            for item in res.data:
-                emb_str = item.get("embedding")
-                if isinstance(emb_str, str):
-                    emb_str = emb_str.strip().lstrip("[").rstrip("]")
-                    emb = [float(x) for x in emb_str.split(",") if x.strip()]
-                elif isinstance(emb_str, list):
-                    emb = [float(x) for x in emb_str]
-                else:
-                    emb = []
-                
-                docs.append({
-                    "id": item.get("id"),
-                    "content": item.get("content"),
-                    "metadata": item.get("metadata") or {},
-                    "embedding": emb
-                })
-            
-            try:
-                await self.redis_client.set(self.cache_key, json.dumps(docs))
-                logger.info(f"Loaded {len(docs)} documents into Redis cache successfully.")
-            except Exception as e:
-                logger.error(f"Redis cache write error: {e}")
-                
-            return docs
-        except Exception as e:
-            logger.error(f"Failed to load documents from database: {e}")
-            return []
-
-    async def clear_cache(self):
-        try:
-            await self.redis_client.delete(self.cache_key)
-            logger.info("Redis document cache cleared.")
-        except Exception as e:
-            logger.error(f"Failed to clear Redis document cache: {e}")
-
-    async def asimilarity_search(self, query: str, k: int = 5, filter: dict = None) -> list[Document]:
-        docs = await self._get_all_documents()
-        if not docs:
-            return []
-
-        if hasattr(self.embeddings, "aembed_query"):
-            query_vector = await self.embeddings.aembed_query(query)
-        else:
-            query_vector = self.embeddings.embed_query(query)
-
-        def dot_product(v1, v2):
-            return sum(x * y for x, y in zip(v1, v2))
-
-        def magnitude(v):
-            return math.sqrt(sum(x * x for x in v))
-
-        def cosine_similarity(v1, v2):
-            m1 = magnitude(v1)
-            m2 = magnitude(v2)
-            if m1 == 0 or m2 == 0:
-                return 0.0
-            return dot_product(v1, v2) / (m1 * m2)
-
-        scored_docs = []
-        for doc in docs:
-            if filter:
-                match = True
-                for fk, fv in filter.items():
-                    if doc["metadata"].get(fk) != fv:
-                        match = False
-                        break
-                if not match:
-                    continue
-
-            emb = doc["embedding"]
-            if not emb:
-                continue
-
-            sim = cosine_similarity(query_vector, emb)
-            scored_docs.append((doc, sim))
-
-        scored_docs.sort(key=lambda x: x[1], reverse=True)
-
-        results = []
-        for doc, sim in scored_docs[:k]:
-            results.append(Document(
-                page_content=doc["content"],
-                metadata={**doc["metadata"], "similarity": sim}
-            ))
-        return results
-
-    def as_retriever(self, search_kwargs: dict = None):
-        return LocalVectorStoreRetriever(self, search_kwargs or {})
-
-
-class LocalVectorStoreRetriever:
-    def __init__(self, vector_store: LocalSupabaseVectorStore, search_kwargs: dict):
-        self.vector_store = vector_store
-        self.search_kwargs = search_kwargs
-
-    async def ainvoke(self, query: str) -> list[Document]:
-        k = self.search_kwargs.get("k", 5)
-        filter = self.search_kwargs.get("filter")
-        return await self.vector_store.asimilarity_search(query, k=k, filter=filter)
-
-
 class LLMService:
     def __init__(self):
+        # --- Redis Cache ---
+        try:
+            self.redis_client = redis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
+            logger.info("Redis client initialized.")
+        except Exception as e:
+            logger.error(f"Error initializing Redis client: {e}")
+            self.redis_client = None
 
         # --- DB + Retriever ---
         try:
@@ -149,10 +36,13 @@ class LLMService:
                 settings.SUPABASE_URL,
                 settings.SUPABASE_SERVICE_KEY
             )
-            self.db = LocalSupabaseVectorStore(
+            
+            # Use Native Supabase Vector Store
+            self.db = SupabaseVectorStore(
+                embedding=self.embeddings,
                 client=self.supabase_client,
-                embeddings=self.embeddings,
-                table_name="documents"
+                table_name="documents",
+                query_name="match_documents"
             )
 
             # ✅ Plain base retriever — no wrapper needed
@@ -199,7 +89,8 @@ class LLMService:
                 api_key=settings.GROQ_API_KEY,
                 model=model_name,
                 temperature=0.3,
-                max_tokens=1500
+                max_tokens=1500,
+                model_kwargs={"response_format": {"type": "json_object"}}
             )
             logger.info(f"LLM initialized: {model_name}")
 
@@ -278,7 +169,7 @@ class LLMService:
         # --- LLM Response Caching ---
         cache_key = f"llm_response:{text}"
         try:
-            cached_response = await self.db.redis_client.get(cache_key)
+            cached_response = await self.redis_client.get(cache_key)
             if cached_response:
                 logger.info("Returning cached LLM response.")
                 yield f"data: {json.dumps({'response': cached_response})}\n\n"
@@ -374,13 +265,12 @@ class LLMService:
             "You are the official chatbot of GLUG (GNU/Linux Users' Group), a technical club at NIT Durgapur. "
             "Never refer to the club simply as 'NIT Durgapur'; it is 'GLUG'. "
             "Answer the user's question directly using ONLY the provided context below. "
-            "If the context contains profiles with names, years, and roles, assume they "
-            "are the members or alumni of GLUG being asked about. "
-            "IMPORTANT: Count them accurately. Do NOT estimate. State the exact count based on the provided context, "
-            "and then list ALL of their names clearly. Do not truncate or limit the list to a few examples; list EVERY person found in the context. "
-            "Read through all the provided context carefully to provide a comprehensive answer. "
-            "If you truly cannot find the answer in the context, say: "
-            "'I don't have that information right now.'"
+            "IMPORTANT: You MUST respond with a valid JSON object. "
+            "The JSON object must have two exact keys:\n"
+            "1. 'answer_summary': A string containing a natural language response addressing the user's query. If the context contains profiles, count them accurately and state the number here.\n"
+            "2. 'data_list': An array of JSON objects extracting relevant structured data from the context (e.g., [{'name': 'Ankan', 'role': 'Alumni', 'github': '...', 'skills': [...]}, ...]). "
+            "List EVERY person/event found in the context. Do not truncate.\n"
+            "If you truly cannot find the answer, set 'answer_summary' to 'I don't have that information right now.' and 'data_list' to an empty array []."
         )
 
         messages = [
@@ -400,7 +290,7 @@ class LLMService:
             
             # --- Save to LLM Response Cache ---
             try:
-                await self.db.redis_client.setex(cache_key, 86400, full_response)
+                await self.redis_client.setex(cache_key, 86400, full_response)
             except Exception as e:
                 logger.error(f"Redis response cache write error: {e}")
                 
@@ -411,8 +301,9 @@ class LLMService:
             yield "data: [DONE]\n\n"
 
     async def refresh_cache(self):
-        if hasattr(self.db, "clear_cache"):
-            await self.db.clear_cache()
+        # Redis clear cache is now manual if needed since we cache LLM responses instead of the whole DB
+        if self.redis_client:
+            await self.redis_client.flushdb()
 
 
 

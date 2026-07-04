@@ -167,14 +167,24 @@ async def scrape_all_endpoints() -> dict:
                     if not text.strip():
                         continue
 
-                    text = await enrich_cached(clean_source, text, cache)
+                    json_result_str = await enrich_cached(clean_source, text, cache)
+                    
+                    try:
+                        import json
+                        parsed = json.loads(json_result_str)
+                        prose_text = parsed.get("prose", json_result_str)
+                        skills = parsed.get("skills", [])
+                    except Exception:
+                        prose_text = json_result_str
+                        skills = []
 
                     doc = Document(
-                        page_content=text,
+                        page_content=prose_text,
                         metadata={
                             "source": clean_source,
                             "endpoint": source_name,
-                            "url": url
+                            "url": url,
+                            "skills": skills
                         }
                     )
                     all_documents.append(doc)

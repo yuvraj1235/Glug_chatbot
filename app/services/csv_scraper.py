@@ -52,8 +52,16 @@ async def parse_csv_to_documents(content: bytes, source_label: str, filename: st
         # Create the raw payload
         raw_text = f"Context: {csv_title}\n" + "\n".join(parts)
 
-        # 🚀 MAGIC STEP: Translate the raw CSV row into common sense prose!
-        prose_text = await enrich_cached(source_label, raw_text, cache)
+        json_result_str = await enrich_cached(source_label, raw_text, cache)
+        
+        try:
+            import json
+            parsed = json.loads(json_result_str)
+            prose_text = parsed.get("prose", json_result_str)
+            skills = parsed.get("skills", [])
+        except Exception:
+            prose_text = json_result_str
+            skills = []
 
         docs.append(
             Document(
@@ -64,6 +72,7 @@ async def parse_csv_to_documents(content: bytes, source_label: str, filename: st
                     "endpoint": "csv_upload",
                     "url": f"file://{filename}",
                     "row": row_idx,
+                    "skills": skills,
                 },
             )
         )
