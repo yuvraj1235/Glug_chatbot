@@ -164,10 +164,13 @@ class LLMService:
             yield "data: [DONE]\n\n"
             return
 
-        text = message.lower().strip()
+        # Normalize text for smarter caching (removes punctuation and extra spaces)
+        import string
+        normalized_text = text.translate(str.maketrans('', '', string.punctuation))
+        normalized_text = ' '.join(normalized_text.split())
         
         # --- LLM Response Caching ---
-        cache_key = f"llm_response:{text}"
+        cache_key = f"llm_response:{normalized_text}"
         try:
             cached_response = await self.redis_client.get(cache_key)
             if cached_response:
