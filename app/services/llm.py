@@ -265,10 +265,21 @@ class LLMService:
             logger.error(f"[Retrieval] Error: {e}")
 
         # Step 6 — LLM
+        TABLE_DESCRIPTIONS = {
+            "profiles": "Profiles of current students and core members of the club.",
+            "alumni": "Profiles of graduated students (alumni).",
+            "events": "Details about events, hackathons, and workshops conducted by the club.",
+            "project": "Open-source projects or GitHub repositories created by the club.",
+            "ctf": "Cybersecurity challenges, CTFs (Capture The Flag), or hacking events.",
+            "techbytes": "Technical blogs, write-ups, or articles published by the club."
+        }
+        readme_str = "\\n".join([f"- {k}: {v}" for k, v in TABLE_DESCRIPTIONS.items()])
+        
         system_instruction = (
             "You are the official chatbot of GLUG (GNU/Linux Users' Group), a technical club at NIT Durgapur. "
             "Never refer to the club simply as 'NIT Durgapur'; it is 'GLUG'. "
             "Answer the user's question directly using ONLY the provided context below. "
+            f"To help you understand the context, here is a README of the different data sources it may contain:\\n{readme_str}\\n\\n"
             "IMPORTANT: You MUST respond with a valid JSON object. "
             "The JSON object must have two exact keys:\n"
             "1. 'answer_summary': A string containing a natural language response addressing the user's query. If the context contains profiles, count them accurately and state the number here.\n"

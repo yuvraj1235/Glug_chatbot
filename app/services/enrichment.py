@@ -98,6 +98,16 @@ async def enrich_with_hf_summary(
         logger.warning(f"[Enrichment] Groq API key not found. Skipping transformation for source={source}")
         return f"Source Section: {source}\n\n{raw_text}"
 
+    TABLE_DESCRIPTIONS = {
+        "profiles": "This data contains profiles of current students and core members of the club. They are active contributors.",
+        "alumni": "This data contains profiles of graduated students (alumni). They have completed their degrees.",
+        "events": "This data contains details about events, hackathons, and workshops conducted by the club.",
+        "project": "This data contains open-source projects or GitHub repositories created by the club or its members.",
+        "ctf": "This data contains cybersecurity challenges, CTFs (Capture The Flag), or hacking events.",
+        "techbytes": "This data contains technical blogs, write-ups, or articles published by the club."
+    }
+    table_desc = TABLE_DESCRIPTIONS.get(source, "This data contains general records.")
+
     # Construct source-specific descriptive instruction contexts
     if source == "profiles":
         style_instruction = (
@@ -121,6 +131,7 @@ async def enrich_with_hf_summary(
     system_prompt = (
         "You are an expert data-transformation engineer. "
         f"Your task is to rewrite raw technical text into clean, high-density natural language prose, AND extract skills.\n"
+        f"CONTEXT: This data comes from the '{source}' table. {table_desc}\n"
         f"CRITICAL RULES:\n"
         f"1. Follow this style: {style_instruction}\n"
         f"2. Output ONLY a valid JSON object with exactly two keys: 'prose' (string) and 'skills' (list of strings). No conversational preambles, introductory lines, or markdown annotations.\n"
