@@ -16,12 +16,18 @@ class Settings(BaseSettings):
     SUPABASE_URL: str
     SUPABASE_SERVICE_KEY: str
 
-    # 2. Update model settings for Hugging Face Cloud Inference
-    HF_MODEL_REPO: str = "Qwen/Qwen2.5-72B-Instruct"
-    HUGGINGFACEHUB_API_TOKEN: str
+    # 2. Enforce Groq configuration for fast, free cloud text generation
+    GROQ_API_KEY: str | None = None
+    DEFAULT_MODEL: str = "llama-3.1-8b-instant"
 
-    # 3. Make Gemini optional so the app doesn't crash if it's left out
+    # 3. Make legacy cloud tokens optional so existing setups don't break
+    HUGGINGFACEHUB_API_TOKEN: str | None = None
+    HF_MODEL_REPO: str | None = None
     GEMINI_API_KEY: str | None = None
-    DEFAULT_MODEL: str = "gemini-2.5-flash"
+    COHERE_API_KEY: str | None = None
+    USE_RERANKER: bool = True
+    
+    # 4. Redis configuration
+    REDIS_URL: str = "redis://localhost:6379/0"
 
 settings = Settings()

@@ -1,0 +1,12 @@
+Total docs in cache: 275
+Sources count:
+  events: 91
+  alumni: 95
+  profiles: 57
+  linit: 6
+  project: 17
+  contact: 5
+  techbytes: 1
+  devposts: 1
+  configs: 1
+  ctf: 1
