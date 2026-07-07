@@ -89,8 +89,7 @@ class LLMService:
                 api_key=settings.GROQ_API_KEY,
                 model=model_name,
                 temperature=0.3,
-                max_tokens=1500,
-                model_kwargs={"response_format": {"type": "json_object"}}
+                max_tokens=1500
             )
             logger.info(f"LLM initialized: {model_name}")
 
@@ -281,6 +280,7 @@ class LLMService:
             "Answer the user's question directly using ONLY the provided context below. "
             f"To help you understand the context, here is a README of the different data sources it may contain:\\n{readme_str}\\n\\n"
             "IMPORTANT: You MUST respond with a valid JSON object. "
+            "DO NOT wrap the response in markdown blocks (like ```json). Output ONLY the raw JSON string starting with '{' and ending with '}'. "
             "The JSON object must have two exact keys:\n"
             "1. 'answer_summary': A string containing a natural language response addressing the user's query. If the context contains profiles, count them accurately and state the number here.\n"
             "2. 'data_list': An array of JSON objects extracting relevant structured data from the context (e.g., [{'name': 'Ankan', 'role': 'Alumni', 'github': '...', 'skills': [...]}, ...]). "
@@ -296,16 +296,17 @@ class LLMService:
         ]
 
         try:
-            # Calculate the full response in the background
-            response = await self.llm.ainvoke(messages)
-            full_response = response.content
-            
-            # Yield as a single well-built paragraph
-            yield f"data: {json.dumps({'response': full_response})}\n\n"
+            # Stream the response chunks in the background
+            full_response = ""
+            async for chunk in self.llm.astream(messages):
+                if chunk.content:
+                    full_response += chunk.content
+                    yield f"data: {json.dumps({'response': chunk.content})}\n\n"
             
             # --- Save to LLM Response Cache ---
             try:
-                await self.redis_client.setex(cache_key, 86400, full_response)
+                if self.redis_client:
+                    await self.redis_client.setex(cache_key, 86400, full_response)
             except Exception as e:
                 logger.error(f"Redis response cache write error: {e}")
                 
