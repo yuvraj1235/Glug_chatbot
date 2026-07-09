@@ -19,20 +19,7 @@ import redis.asyncio as redis
 class LLMService:
     def __init__(self):
         # --- Redis Cache ---
-        try:
-            self.redis_client = redis.from_url(
-                settings.REDIS_URL,
-                encoding="utf-8",
-                decode_responses=True,
-                socket_timeout=5.0,
-                socket_connect_timeout=5.0,
-                retry_on_timeout=True,
-                health_check_interval=30
-            )
-            logger.info("Redis client initialized.")
-        except Exception as e:
-            logger.error(f"Error initializing Redis client: {e}")
-            self.redis_client = None
+        self.redis_client = None
 
         # --- DB + Retriever ---
         try:
@@ -104,6 +91,26 @@ class LLMService:
         except Exception as e:
             logger.error(f"Error configuring LLM: {e}")
             self.llm = None
+
+    async def _get_redis_client(self):
+        if not hasattr(self, 'redis_client') or self.redis_client is None:
+            try:
+                kwargs = {
+                    "encoding": "utf-8",
+                    "decode_responses": True,
+                    "socket_timeout": 5.0,
+                    "socket_connect_timeout": 5.0,
+                    "retry_on_timeout": True,
+                    "health_check_interval": 30
+                }
+                if settings.REDIS_URL.startswith("rediss://"):
+                    kwargs["ssl_cert_reqs"] = "none"
+                self.redis_client = redis.from_url(settings.REDIS_URL, **kwargs)
+                logger.info("Redis client initialized.")
+            except Exception as e:
+                logger.error(f"Error initializing Redis client: {e}")
+                self.redis_client = None
+        return self.redis_client
 
     def _get_search_filter(self, text: str) -> dict:
         if any(k in text for k in [
@@ -178,14 +185,16 @@ class LLMService:
         normalized_text = ' '.join(normalized_text.split())
         
         # --- LLM Response Caching ---
+        redis_client = await self._get_redis_client()
         cache_key = f"llm_response:{normalized_text}"
         try:
-            cached_response = await self.redis_client.get(cache_key)
-            if cached_response:
-                logger.info("Returning cached LLM response.")
-                yield f"data: {json.dumps({'response': cached_response})}\n\n"
-                yield "data: [DONE]\n\n"
-                return
+            if redis_client:
+                cached_response = await redis_client.get(cache_key)
+                if cached_response:
+                    logger.info("Returning cached LLM response.")
+                    yield f"data: {json.dumps({'response': cached_response})}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
         except Exception as e:
             logger.error(f"Redis response cache read error: {e}")
 
@@ -332,8 +341,9 @@ class LLMService:
             
             # --- Save to LLM Response Cache ---
             try:
-                if self.redis_client:
-                    await self.redis_client.setex(cache_key, 86400, full_response)
+                redis_client = await self._get_redis_client()
+                if redis_client:
+                    await redis_client.setex(cache_key, 86400, full_response)
             except Exception as e:
                 logger.error(f"Redis response cache write error: {e}")
                 
@@ -345,8 +355,9 @@ class LLMService:
 
     async def refresh_cache(self):
         # Redis clear cache is now manual if needed since we cache LLM responses instead of the whole DB
-        if self.redis_client:
-            await self.redis_client.flushdb()
+        redis_client = await self._get_redis_client()
+        if redis_client:
+            await redis_client.flushdb()
 
 
 
