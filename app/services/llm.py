@@ -20,7 +20,15 @@ class LLMService:
     def __init__(self):
         # --- Redis Cache ---
         try:
-            self.redis_client = redis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
+            self.redis_client = redis.from_url(
+                settings.REDIS_URL,
+                encoding="utf-8",
+                decode_responses=True,
+                socket_timeout=5.0,
+                socket_connect_timeout=5.0,
+                retry_on_timeout=True,
+                health_check_interval=30
+            )
             logger.info("Redis client initialized.")
         except Exception as e:
             logger.error(f"Error initializing Redis client: {e}")
