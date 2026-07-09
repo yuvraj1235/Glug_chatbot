@@ -8,11 +8,10 @@ class RateLimiter:
 
     async def __call__(self, request: Request):
         llm = get_llm_service()
-        if not llm.redis_client:
+        redis_client = await llm._get_redis_client()
+        if not redis_client:
             print("RateLimiter bypassed: No redis_client")
             return
-        
-        redis_client = llm.redis_client
         client_ip = request.client.host if request.client else "unknown"
         path = request.url.path
         
