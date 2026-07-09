@@ -15,19 +15,25 @@ logging.basicConfig(
 # This is the "app" that Uvicorn is looking for!
 app = FastAPI(title="GLUG Chatbot API")
 
-origins = [
-    "http://localhost:3000",  
-    "http://localhost:5173",  
-    "http://127.0.0.1:5173",  
+default_origins = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
     "http://localhost:8000",
+    "https://club-website-2-0-sable.vercel.app",
 ]
 
+env_origins = os.getenv("ALLOWED_ORIGINS", "")
+origins = [origin.strip() for origin in env_origins.split(",") if origin.strip()]
+origins = origins or default_origins
+
 app.add_middleware(
-    CORSMiddleware, 
-    allow_origins=origins,   
-    allow_credentials=True,  
-    allow_methods=["*"],     
-    allow_headers=["*"],     
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Attach your routers to the main app
