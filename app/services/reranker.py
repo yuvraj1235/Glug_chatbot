@@ -11,13 +11,22 @@ logger = logging.getLogger("chatbot")
 class HFServerlessReranker(BaseDocumentCompressor):
     api_token: str
     model_name: str = Field(default="BAAI/bge-reranker-base")
-    top_n: int = Field(default=4)
+    top_n: int = Field(default=8)
 
     model_config = {
         "protected_namespaces": (),
     }
 
     def compress_documents(
+        self,
+        documents: Sequence[Document],
+        query: str,
+        callbacks: Optional[Callbacks] = None,
+    ) -> Sequence[Document]:
+        """Sync fallback — not used in the async pipeline."""
+        return list(documents)[: self.top_n]
+
+    async def acompress_documents(
         self,
         documents: Sequence[Document],
         query: str,
@@ -43,8 +52,8 @@ class HFServerlessReranker(BaseDocumentCompressor):
         }
 
         try:
-            with httpx.Client() as client:
-                response = client.post(
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
                     url,
                     headers=headers,
                     json=payload,
@@ -95,13 +104,22 @@ class HFServerlessReranker(BaseDocumentCompressor):
 class CohereReranker(BaseDocumentCompressor):
     api_token: str
     model_name: str = Field(default="rerank-v3.5")
-    top_n: int = Field(default=4)
+    top_n: int = Field(default=8)
 
     model_config = {
         "protected_namespaces": (),
     }
 
     def compress_documents(
+        self,
+        documents: Sequence[Document],
+        query: str,
+        callbacks: Optional[Callbacks] = None,
+    ) -> Sequence[Document]:
+        """Sync fallback — not used in the async pipeline."""
+        return list(documents)[: self.top_n]
+
+    async def acompress_documents(
         self,
         documents: Sequence[Document],
         query: str,
@@ -124,8 +142,8 @@ class CohereReranker(BaseDocumentCompressor):
         }
 
         try:
-            with httpx.Client() as client:
-                response = client.post(
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
                     url,
                     headers=headers,
                     json=payload,

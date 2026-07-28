@@ -43,7 +43,7 @@ class LLMService:
             # ✅ Plain base retriever — no wrapper needed
             self.base_retriever = self.db.as_retriever(
                 search_kwargs={"k": 20}
-            )
+            )  # k capped at 20; overridden per-query but never above 20
 
             # ✅ Reranker called directly in generate_response if enabled
             if settings.USE_RERANKER:
@@ -150,12 +150,12 @@ class LLMService:
         message: str,
         years: list[str],
         search_filter: dict,
-        limit: int = 80
+        limit: int = 10
     ) -> list[str]:
         try:
             broad_docs = await self.db.asimilarity_search(
                 message,
-                k=30,
+                k=20,
                 filter=search_filter if search_filter else None
             )
             matched = []
@@ -205,42 +205,48 @@ class LLMService:
             search_filter = self._get_search_filter(text)
             logger.debug(f"[Routing] filter={search_filter}")
 
-            # Step 2 — Year exact match boost
-            exact_match_docs = []
+            # Step 2 — Year exact match boost + vector retrieval (parallelized)
             years_in_prompt = re.findall(r'\b20\d{2}\b', text)
+
+            # Update filter per query before parallel dispatch
+            self.base_retriever.search_kwargs = {
+                "k": 20,
+                "filter": search_filter if search_filter else None
+            }
+
             if years_in_prompt:
-                exact_match_docs = await self._get_year_exact_matches(
+                # Run year-match and vector retrieval concurrently
+                year_task = self._get_year_exact_matches(
                     message, years_in_prompt, search_filter
                 )
+                retrieval_task = self.base_retriever.ainvoke(message)
+                exact_match_docs, retrieved = await asyncio.gather(
+                    year_task, retrieval_task
+                )
                 logger.debug(f"[YearMatch] Found {len(exact_match_docs)} matches")
+            else:
+                exact_match_docs = []
+                retrieved = await self.base_retriever.ainvoke(message)
 
-            # Step 3 — Vector search + rerank directly
+            logger.debug(f"[Retriever] Got {len(retrieved)} docs")
+
+            # Step 3 — Rerank
             reranked_docs = []
             try:
-                # Update filter per query
-                self.base_retriever.search_kwargs = {
-                    "k": 80,
-                    "filter": search_filter if search_filter else None
-                }
-
-                # ✅ Vector search
-                retrieved = await self.base_retriever.ainvoke(message)
-                logger.debug(f"[Retriever] Got {len(retrieved)} docs")
-
-                # ✅ Rerank directly — no ContextualCompressionRetriever needed
+                # ✅ Rerank directly — using async to avoid blocking the event loop
                 if self.compressor and retrieved:
-                    reranked = self.compressor.compress_documents(retrieved, message)
+                    reranked = await self.compressor.acompress_documents(retrieved, message)
                     reranked_docs = [doc.page_content for doc in reranked]
                     logger.debug(f"[Reranker] Returned {len(reranked_docs)} docs")
                 else:
-                    reranked_docs = [doc.page_content for doc in retrieved[:80]]
+                    reranked_docs = [doc.page_content for doc in retrieved[:20]]
 
             except Exception as e:
                 # Fallback to plain vector search
                 logger.warning(f"[Retrieval] Failed, using fallback: {e}")
                 fallback = await self.db.asimilarity_search(
                     message,
-                    k=80,
+                    k=20,
                     filter=search_filter if search_filter else None
                 )
                 reranked_docs = [doc.page_content for doc in fallback]
@@ -257,7 +263,7 @@ class LLMService:
             if final_chunks:
                 processed_chunks = []
                 current_length = 0
-                max_total_chars = 10000  # Groq Llama-3.1-8b easily handles 15k+ chars of context
+                max_total_chars = 8000  # Reduced to lower LLM input tokens and latency
 
                 for chunk in final_chunks:
                     # Estimate the length this chunk will add (including dividers)
