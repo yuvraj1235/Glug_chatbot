@@ -1,0 +1,298 @@
+{
+  "cec301": {
+    "branch": "cve",
+    "exam_types": {
+      "endsem": ["2025"],
+      "midsem": ["2025"]
+    },
+    "sem": 3
+  },
+  "cec302": {
+    "branch": "cve",
+    "exam_types": {
+      "endsem": ["2025"],
+      "midsem": ["2025"]
+    },
+    "sem": 3
+  },
+  "cec303": {
+    "branch": "cve",
+    "exam_types": {
+      "midsem": ["2025"]
+    },
+    "sem": 3
+  },
+  "cec401": {
+    "branch": "cve",
+    "exam_types": {
+      "midsem": ["2025"]
+    },
+    "sem": 4
+  },
+  "cec402": {
+    "branch": "cve",
+    "exam_types": {
+      "midsem": ["2025"]
+    },
+    "sem": 4
+  },
+  "cec403": {
+    "branch": "cve",
+    "exam_types": {
+      "midsem": ["2025"]
+    },
+    "sem": 4
+  },
+  "cec404": {
+    "branch": "cve",
+    "exam_types": {
+      "midsem": ["2025"]
+    },
+    "sem": 4
+  },
+  "cec405": {
+    "branch": "cve",
+    "exam_types": {
+      "midsem": ["2025"]
+    },
+    "sem": 4
+  },
+  "cs01": {
+    "branch": "common",
+    "exam_types": {
+      "endsem": ["2022", "2023", "2024", "2025"],
+      "midsem": ["2022", "2023", "2025"]
+    },
+    "sem": 1
+  },
+  "cs02": {
+    "branch": "common",
+    "exam_types": {
+      "endsem": ["2023", "2024", "2025"],
+      "midsem": ["2023", "2024", "2025"]
+    },
+    "sem": 2
+  },
+  "cs301": {
+    "branch": "cse",
+    "exam_types": {
+      "endsem": ["2024", "2025"],
+      "midsem": ["2024"]
+    },
+    "sem": 3
+  },
+  "cs302": {
+    "branch": "cse",
+    "exam_types": {
+      "endsem": ["2024"],
+      "midsem": ["2024"]
+    },
+    "sem": 3
+  },
+  "cs303": {
+    "branch": "cse",
+    "exam_types": {
+      "endsem": ["2024"],
+      "midsem": ["2024", "2025"]
+    },
+    "sem": 3
+  },
+  "cs304": {
+    "branch": "cse",
+    "exam_types": {
+      "endsem": ["2023"],
+      "midsem": ["2025"]
+    },
+    "sem": 3
+  },
+  "cs401": {
+    "branch": "cse",
+    "exam_types": {
+      "endsem": ["2024"],
+      "midsem": ["2024"]
+    },
+    "sem": 4
+  },
+  "cs501": {
+    "branch": "cse",
+    "exam_types": {
+      "endsem": ["2025"],
+      "midsem": ["2025"]
+    },
+    "sem": 5
+  },
+  "cs502": {
+    "branch": "cse",
+    "exam_types": {
+      "endsem": ["2025"],
+      "midsem": ["2025"]
+    },
+    "sem": 5
+  },
+  "cs503": {
+    "branch": "cse",
+    "exam_types": {
+      "endsem": ["2025"],
+      "midsem": ["2025"]
+    },
+    "sem": 5
+  },
+  "cs504": {
+    "branch": "cse",
+    "exam_types": {
+      "endsem": ["2025"],
+      "midsem": ["2025"]
+    },
+    "sem": 5
+  },
+  "cs518": {
+    "branch": "cse",
+    "exam_types": {
+      "endsem": ["2025"],
+      "midsem": ["2025"]
+    },
+    "sem": 5
+  },
+  "cs601": {
+    "branch": "cse",
+    "exam_types": {
+      "endsem": ["2024"],
+      "midsem": ["2025"]
+    },
+    "sem": 6
+  },
+  "cs602": {
+    "branch": "cse",
+    "exam_types": {
+      "midsem": ["2024", "2025"]
+    },
+    "sem": 6
+  },
+  "cs618": {
+    "branch": "cse",
+    "exam_types": {
+      "endsem": ["2025"],
+      "midsem": ["2025"]
+    },
+    "sem": 6
+  },
+  "cs622": {
+    "branch": "cse",
+    "exam_types": {
+      "endsem": ["2022"],
+      "midsem": ["2022"]
+    },
+    "sem": 6
+  },
+  "csc402": {
+    "branch": "cse",
+    "exam_types": {
+      "endsem": ["2024"],
+      "midsem": ["2024"]
+    },
+    "sem": 4
+  },
+  "csc403": {
+    "branch": "cse",
+    "exam_types": {
+      "endsem": ["2024"],
+      "midsem": ["2024", "2025"]
+    },
+    "sem": 4
+  },
+  "csc404": {
+    "branch": "cse",
+    "exam_types": {
+      "midsem": ["2024", "2025"]
+    },
+    "sem": 4
+  },
+  "cy01": {
+    "branch": "common",
+    "exam_types": {
+      "endsem": ["2022", "2023", "2024", "2025"],
+      "midsem": ["2021", "2022", "2023", "2024", "2025"]
+    },
+    "sem": 1
+  },
+  "es01": {
+    "branch": "common",
+    "exam_types": {
+      "endsem": ["2022", "2023", "2024", "2025"],
+      "midsem": ["2021", "2022", "2023", "2024", "2025"]
+    },
+    "sem": 1
+  },
+  "esc331": {
+    "branch": "cve",
+    "exam_types": {
+      "endsem": ["2025"],
+      "midsem": ["2025"]
+    },
+    "sem": 3
+  },
+  "hs01": {
+    "branch": "common",
+    "exam_types": {
+      "endsem": ["2023", "2024", "2025"],
+      "midsem": ["2023", "2025"]
+    },
+    "sem": 1
+  },
+  "hs631": {
+    "branch": "cse",
+    "exam_types": {
+      "endsem": ["2025"],
+      "midsem": ["2025"]
+    },
+    "sem": 6
+  },
+  "ma01": {
+    "branch": "common",
+    "exam_types": {
+      "endsem": ["2019", "2022", "2023", "2024", "2025"],
+      "midsem": ["2023"]
+    },
+    "sem": 1
+  },
+  "ma02": {
+    "branch": "common",
+    "exam_types": {
+      "endsem": ["2022", "2023", "2024", "2025"],
+      "midsem": ["2021", "2023", "2024", "2025"]
+    },
+    "sem": 2
+  },
+  "ma331": {
+    "branch": "cse",
+    "exam_types": {
+      "endsem": ["2024"],
+      "midsem": ["2024", "2025"]
+    },
+    "sem": 3
+  },
+  "ph01": {
+    "branch": "common",
+    "exam_types": {
+      "endsem": ["2022", "2023", "2024", "2025"],
+      "midsem": ["2021", "2022", "2023", "2025"]
+    },
+    "sem": 1
+  },
+  "xe01": {
+    "branch": "common",
+    "exam_types": {
+      "endsem": ["2019", "2022", "2023", "2024", "2025"],
+      "midsem": ["2023", "2025"]
+    },
+    "sem": 1
+  },
+  "xe02": {
+    "branch": "common",
+    "exam_types": {
+      "endsem": ["2023", "2024", "2025"],
+      "midsem": ["2023", "2024", "2025"]
+    },
+    "sem": 2
+  }
+}
