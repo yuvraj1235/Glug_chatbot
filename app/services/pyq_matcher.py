@@ -520,13 +520,28 @@ def _extract_subject_code(text: str) -> Optional[str]:
     for key in sorted(SUBJECT_MAP.keys(), key=len, reverse=True):
         if re.search(r"\b" + re.escape(key) + r"\b", text):
             code = SUBJECT_MAP[key]
+            
+            # Handle aliases for codes (e.g. phc01 -> ph01, csc01 -> cs01)
+            if code not in MANIFEST and len(code) > 2 and code[2] == 'c':
+                alt_code = code[:2] + code[3:]
+                if alt_code in MANIFEST:
+                    code = alt_code
+                    
             if code in MANIFEST:
                 return code
 
     # 2. Try a literal subject code the user typed directly (e.g. "cs301")
     for m in CODE_RE.finditer(text):
-        if m.group(1) in MANIFEST:
-            return m.group(1)
+        code = m.group(1)
+        
+        # Handle aliases for codes (e.g. phc01 -> ph01, csc01 -> cs01)
+        if code not in MANIFEST and len(code) > 2 and code[2] == 'c':
+            alt_code = code[:2] + code[3:]
+            if alt_code in MANIFEST:
+                code = alt_code
+                
+        if code in MANIFEST:
+            return code
 
     return None
 
