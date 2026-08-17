@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     # 2. Enforce Groq configuration for fast, free cloud text generation
     GROQ_API_KEY: str | None = None
-    DEFAULT_MODEL: str = "llama-3.1-8b-instant"
+    DEFAULT_MODEL: str = "openai/gpt-oss-20b"
 
     # 3. Make legacy cloud tokens optional so existing setups don't break
     HUGGINGFACEHUB_API_TOKEN: str | None = None

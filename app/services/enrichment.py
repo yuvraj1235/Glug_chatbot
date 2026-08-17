@@ -151,7 +151,7 @@ async def enrich_with_hf_summary(
                         "Content-Type": "application/json"
                     },
                     json={
-                        "model": "llama-3.1-8b-instant",
+                        "model": "openai/gpt-oss-20b",
                         "messages": [
                             {"role": "system", "content": system_prompt},
                             {"role": "user", "content": f"Raw text data payload to transform:\n{raw_text[:2500]}"}

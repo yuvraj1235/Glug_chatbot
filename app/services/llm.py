@@ -16,6 +16,14 @@ logger = logging.getLogger("chatbot")
 import json
 import redis.asyncio as redis
 
+FALLBACK_MESSAGE = (
+    "I'm GLUG's official assistant and can only answer questions about "
+    "GLUG (GNU/Linux Users' Group) — its members, alumni, events, projects, "
+    "CTF challenges, and TechBytes articles. "
+    "Your question seems to be outside that scope. "
+    "Feel free to ask me anything about GLUG! 🐧"
+)
+
 class LLMService:
     def __init__(self):
         # --- Redis Cache ---
@@ -77,7 +85,7 @@ class LLMService:
         try:
             model_name = settings.DEFAULT_MODEL
             if "gemini" in model_name.lower():
-                model_name = "llama-3.1-8b-instant"
+                model_name = "openai/gpt-oss-20b"
                 logger.warning(f"Gemini model detected. Swapping to: {model_name}")
 
             self.llm = ChatGroq(
@@ -286,6 +294,13 @@ class LLMService:
         except Exception as e:
             logger.error(f"[Retrieval] Error: {e}")
 
+        # Step 6a — Short-circuit: if no context was retrieved, the question is out of scope
+        if not context_string.strip():
+            logger.info("[Guard] Empty context — returning fallback message without LLM call.")
+            yield f"data: {json.dumps({'response': FALLBACK_MESSAGE})}\n\n"
+            yield "data: [DONE]\n\n"
+            return
+
         # Step 6 — LLM
         TABLE_DESCRIPTIONS = {
             "profiles": "Profiles of current students and core members of the club.",
@@ -327,8 +342,13 @@ class LLMService:
     "- Do not mention that the answer was generated from context or retrieved documents.\n"
     "- If multiple context sources contain the same information, merge them into a single coherent answer.\n"
     "- If the context contains conflicting information, prefer the most complete and recent entry.\n"
-    "- If the requested information is not present in the provided context, reply exactly:\n"
-    "  I don't have that information right now."
+    "- STRICT OUT-OF-SCOPE RULE: If the user's question is about anything unrelated to GLUG "
+    "(e.g., general coding help, math, jokes, other colleges, celebrities, world news, etc.), "
+    "you MUST reply with EXACTLY the following message and nothing else:\n"
+    f"  {FALLBACK_MESSAGE}\n"
+    "- Do NOT attempt to answer out-of-scope questions even partially. Do NOT apologize or explain.\n"
+    "- If the requested GLUG-related information is not present in the provided context, reply with EXACTLY:\n"
+    f"  {FALLBACK_MESSAGE}"
 )
         messages = [
             SystemMessage(content=system_instruction),
