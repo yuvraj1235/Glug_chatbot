@@ -21,6 +21,7 @@ default_origins = [
     "http://127.0.0.1:5173",
     "http://localhost:8000",
     "https://club-website-2-0-sable.vercel.app",
+    "https://nitdgplug.org",
 ]
 
 env_origins = os.getenv("ALLOWED_ORIGINS", "")
