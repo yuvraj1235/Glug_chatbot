@@ -498,6 +498,7 @@ BRANCH_MAP = {
 
 PYQ_TRIGGERS = [
     r"\bpyqs?\b",
+    r"\bpapers?\b",
     r"\bprevious\s+year\s+questions?\b",
     r"\bprevious\s+year\s+papers?\b",
     r"\bquestion\s+papers?\b",
@@ -544,6 +545,49 @@ def _extract_subject_code(text: str) -> Optional[str]:
             return code
 
     return None
+
+
+# ---------------------------------------------------------------------------
+# Helper: did the user actually name a subject that we just couldn't match?
+# ---------------------------------------------------------------------------
+
+# Words/tokens that are NOT themselves subject references
+_NON_SUBJECT_TOKENS = {
+    # PYQ trigger words
+    "pyq", "pyqs", "previous", "year", "question", "questions", "paper", "papers",
+    "past", "exam", "exams", "bank",
+    # semester/year words
+    "sem", "semester", "year", "st", "nd", "rd", "th",
+    "first", "second", "third", "fourth",
+    # branch names (resolved separately)
+    "cse", "cve", "ece", "ee", "me", "che", "bt", "mme", "mac",
+    # filler words
+    "for", "of", "the", "a", "an", "in", "and", "or", "give", "get",
+    "show", "me", "please", "i", "want", "need", "fetch", "find", "all",
+    "latest", "recent", "available", "branch",
+}
+
+def _user_mentioned_subject(text: str) -> bool:
+    """
+    Return True when the user's message contains something that looks like a
+    subject reference (a raw code pattern OR a non-trivial noun phrase) that
+    nevertheless failed to resolve — meaning the subject is not in our data.
+    """
+    # Case 1: a raw code-like token (e.g. "cs999", "xyz12") that CODE_RE matches
+    # but that isn't in the manifest.
+    for m in CODE_RE.finditer(text):
+        candidate = m.group(1)
+        if candidate not in MANIFEST:
+            return True
+
+    # Case 2: the message has at least one "content" word that isn't a trigger /
+    # branch / filler.  Strip digits and short tokens first.
+    tokens = re.findall(r"[a-z]+", text)
+    content_words = [
+        t for t in tokens
+        if len(t) > 2 and t not in _NON_SUBJECT_TOKENS
+    ]
+    return len(content_words) > 0
 
 
 def _extract_branch(text: str) -> Optional[str]:
@@ -665,6 +709,8 @@ async def get_pyq_response(message: str) -> Optional[dict]:
             }
 
     if code is None:
+        mentioned_subject = _user_mentioned_subject(text)
+
         if sems:
             candidates = _codes_for(branch, sems)
             if not candidates and branch is not None:
@@ -679,6 +725,21 @@ async def get_pyq_response(message: str) -> Optional[dict]:
                     "options": [c.upper() for c in candidates],
                 }
 
+        # The user named a subject/code that we couldn't resolve → targeted fallback
+        if mentioned_subject:
+            return {
+                "type": "not_found",
+                "message": (
+                    "Sorry, I couldn't find that subject in our records. "
+                    "Please use the **exact subject name** (e.g. *Data Structures and Algorithms*) "
+                    "or the **exact subject code** (e.g. *cs01*, *csc301*, *cec401*) "
+                    "to get the required PYQs. "
+                    "You can also tell me your **branch + semester** and I'll list all available subjects for you."
+                ),
+                "options": [],
+            }
+
+        # Genuinely no subject hint at all
         return {
             "type": "clarify",
             "message": "I couldn't tell which subject you mean. Could you give the subject "
