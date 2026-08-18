@@ -25,6 +25,8 @@ FALLBACK_MESSAGE = (
 )
 
 class LLMService:
+    MAX_PROMPT_LENGTH = 200  # Must match the frontend character limit
+
     def __init__(self):
         # --- Redis Cache ---
         self.redis_client = None
@@ -180,9 +182,23 @@ class LLMService:
 
     async def generate_response(self, message: str):
         print("LLM:", self.llm)
-        print("DB:",self.db)
+        print("DB:", self.db)
         if not self.llm or not self.db:
             yield f"data: {json.dumps({'response': 'System is currently unavailable or disconnected.'})}\n\n"
+            yield "data: [DONE]\n\n"
+            return
+
+        # --- Prompt length guard (mirrors frontend validation) ---
+        if len(message) > self.MAX_PROMPT_LENGTH:
+            logger.warning(
+                f"[Guard] Prompt rejected — length {len(message)} exceeds "
+                f"limit of {self.MAX_PROMPT_LENGTH}."
+            )
+            error_msg = (
+                f"Your message is too long ({len(message)} characters). "
+                f"Please keep it under {self.MAX_PROMPT_LENGTH} characters."
+            )
+            yield f"data: {json.dumps({'error': error_msg})}\n\n"
             yield "data: [DONE]\n\n"
             return
 
