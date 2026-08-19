@@ -20,14 +20,17 @@ class Settings(BaseSettings):
     GROQ_API_KEY: str | None = None
     DEFAULT_MODEL: str = "openai/gpt-oss-20b"
 
-    # 3. Make legacy cloud tokens optional so existing setups don't break
+    # 3. Cloud tokens & optional services
     HUGGINGFACEHUB_API_TOKEN: str | None = None
     HF_MODEL_REPO: str | None = None
     GEMINI_API_KEY: str | None = None
     COHERE_API_KEY: str | None = None
     USE_RERANKER: bool = True
     
-    # 4. Redis configuration
+    # 4. Redis configuration (for response caching)
     REDIS_URL: str = "redis://localhost:6379/0"
+
+    # 5. In-Memory Cooldown Duration
+    PROMPT_COOLDOWN_SECONDS: int = 30
 
 settings = Settings()

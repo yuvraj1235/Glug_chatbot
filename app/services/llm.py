@@ -1,7 +1,10 @@
 import logging
 import re
 import math
+import time
 import asyncio
+import json
+import redis.asyncio as redis
 from supabase.client import Client, create_client
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEndpointEmbeddings
@@ -12,9 +15,6 @@ from app.config import settings
 from app.services.reranker import HFServerlessReranker, CohereReranker
 
 logger = logging.getLogger("chatbot")
-
-import json
-import redis.asyncio as redis
 
 FALLBACK_MESSAGE = (
     "I'm GLUG's official assistant and can only answer questions about "
@@ -28,6 +28,9 @@ class LLMService:
     MAX_PROMPT_LENGTH = 200  # Must match the frontend character limit
 
     def __init__(self):
+        # --- In-Memory Cooldown Tracker (Independent of Redis) ---
+        self._cooldowns: dict[str, float] = {}
+
         # --- Redis Cache ---
         self.redis_client = None
 
@@ -50,12 +53,12 @@ class LLMService:
                 query_name="match_documents"
             )
 
-            # ✅ Plain base retriever — no wrapper needed
+            # Plain base retriever
             self.base_retriever = self.db.as_retriever(
                 search_kwargs={"k": 20}
-            )  # k capped at 20; overridden per-query but never above 20
+            )
 
-            # ✅ Reranker called directly in generate_response if enabled
+            # Reranker
             if settings.USE_RERANKER:
                 if settings.COHERE_API_KEY:
                     logger.info("Initializing CohereReranker...")
@@ -108,9 +111,9 @@ class LLMService:
                 kwargs = {
                     "encoding": "utf-8",
                     "decode_responses": True,
-                    "socket_timeout": 5.0,
-                    "socket_connect_timeout": 5.0,
-                    "retry_on_timeout": True,
+                    "socket_timeout": 3.0,
+                    "socket_connect_timeout": 3.0,
+                    "retry_on_timeout": False,
                     "health_check_interval": 30
                 }
                 if settings.REDIS_URL.startswith("rediss://"):
@@ -180,7 +183,7 @@ class LLMService:
             logger.error(f"[YearMatch] Failed: {e}")
             return []
 
-    async def generate_response(self, message: str):
+    async def generate_response(self, message: str, session_id: str = "default_session"):
         print("LLM:", self.llm)
         print("DB:", self.db)
         if not self.llm or not self.db:
@@ -188,12 +191,34 @@ class LLMService:
             yield "data: [DONE]\n\n"
             return
 
-        # --- Prompt length guard (mirrors frontend validation) ---
+        now = time.time()
+
+        # --- In-Memory 50s Cooldown Guard (No Redis dependency) ---
+        if session_id in self._cooldowns:
+            expiration = self._cooldowns[session_id]
+            if now < expiration:
+                ttl = int(math.ceil(expiration - now))
+                logger.warning(f"[Guard] Cooldown active for {session_id}. {ttl}s remaining.")
+                error_msg = f"Please wait {ttl} seconds before sending another message."
+                yield f"data: {json.dumps({'error': error_msg})}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+
+        # Set in-memory cooldown timestamp
+        self._cooldowns[session_id] = now + settings.PROMPT_COOLDOWN_SECONDS
+
+        # Periodically purge expired cooldowns to prevent memory growth
+        if len(self._cooldowns) > 1000:
+            self._cooldowns = {k: v for k, v in self._cooldowns.items() if v > now}
+
+        # --- Prompt length guard ---
         if len(message) > self.MAX_PROMPT_LENGTH:
             logger.warning(
                 f"[Guard] Prompt rejected — length {len(message)} exceeds "
                 f"limit of {self.MAX_PROMPT_LENGTH}."
             )
+            # Release lock so user isn't penalized for an invalid message
+            self._cooldowns.pop(session_id, None)
             error_msg = (
                 f"Your message is too long ({len(message)} characters). "
                 f"Please keep it under {self.MAX_PROMPT_LENGTH} characters."
@@ -208,14 +233,14 @@ class LLMService:
         normalized_text = text.translate(str.maketrans('', '', string.punctuation))
         normalized_text = ' '.join(normalized_text.split())
         
-        # --- LLM Response Caching ---
+        # --- Redis LLM Response Caching ---
         redis_client = await self._get_redis_client()
         cache_key = f"llm_response:{normalized_text}"
         try:
             if redis_client:
                 cached_response = await redis_client.get(cache_key)
                 if cached_response:
-                    logger.info("Returning cached LLM response.")
+                    logger.info("Returning cached LLM response from Redis.")
                     yield f"data: {json.dumps({'response': cached_response})}\n\n"
                     yield "data: [DONE]\n\n"
                     return
@@ -239,7 +264,6 @@ class LLMService:
             }
 
             if years_in_prompt:
-                # Run year-match and vector retrieval concurrently
                 year_task = self._get_year_exact_matches(
                     message, years_in_prompt, search_filter
                 )
@@ -257,7 +281,6 @@ class LLMService:
             # Step 3 — Rerank
             reranked_docs = []
             try:
-                # ✅ Rerank directly — using async to avoid blocking the event loop
                 if self.compressor and retrieved:
                     reranked = await self.compressor.acompress_documents(retrieved, message)
                     reranked_docs = [doc.page_content for doc in reranked]
@@ -266,7 +289,6 @@ class LLMService:
                     reranked_docs = [doc.page_content for doc in retrieved[:20]]
 
             except Exception as e:
-                # Fallback to plain vector search
                 logger.warning(f"[Retrieval] Failed, using fallback: {e}")
                 fallback = await self.db.asimilarity_search(
                     message,
@@ -287,17 +309,15 @@ class LLMService:
             if final_chunks:
                 processed_chunks = []
                 current_length = 0
-                max_total_chars = 8000  # Reduced to lower LLM input tokens and latency
+                max_total_chars = 8000
 
                 for chunk in final_chunks:
-                    # Estimate the length this chunk will add (including dividers)
                     added_length = len(chunk) + 5
                     
                     if current_length + added_length <= max_total_chars:
                         processed_chunks.append(chunk)
                         current_length += added_length
                     else:
-                        # Stop adding once the budget is full to keep remaining chunks intact
                         logger.warning(f"[Context] Context limit reached. Omitted {len(final_chunks) - len(processed_chunks)} chunks.")
                         break
                         
@@ -310,7 +330,7 @@ class LLMService:
         except Exception as e:
             logger.error(f"[Retrieval] Error: {e}")
 
-        # Step 6a — Short-circuit: if no context was retrieved, the question is out of scope
+        # Step 6a — Short-circuit: if no context was retrieved, out of scope
         if not context_string.strip():
             logger.info("[Guard] Empty context — returning fallback message without LLM call.")
             yield f"data: {json.dumps({'response': FALLBACK_MESSAGE})}\n\n"
@@ -329,43 +349,43 @@ class LLMService:
         readme_str = "\\n".join([f"- {k}: {v}" for k, v in TABLE_DESCRIPTIONS.items()])
         
         system_instruction = (
-    "You are the official chatbot of GLUG (GNU/Linux Users' Group), the official Open Source and Linux community of NIT Durgapur. "
-    "Always refer to the organization as 'GLUG' or 'GLUG (GNU/Linux Users' Group)'. "
-    "Never refer to the club simply as 'NIT Durgapur'. "
-    "Answer the user's question using ONLY the provided context. "
-    "Do not make up, infer, or assume information that is not present in the context. "
-    f"To help you understand the context, here is a README describing the available data sources:\n\n{readme_str}\n\n"
+            "You are the official chatbot of GLUG (GNU/Linux Users' Group), the official Open Source and Linux community of NIT Durgapur. "
+            "Always refer to the organization as 'GLUG' or 'GLUG (GNU/Linux Users' Group)'. "
+            "Never refer to the club simply as 'NIT Durgapur'. "
+            "Answer the user's question using ONLY the provided context. "
+            "Do not make up, infer, or assume information that is not present in the context. "
+            f"To help you understand the context, here is a README describing the available data sources:\n\n{readme_str}\n\n"
 
-    "IMPORTANT: You MUST respond using beautifully formatted Markdown. "
-    "Never output raw JSON, Python dictionaries, database records, or plain text dumps.\n\n"
+            "IMPORTANT: You MUST respond using beautifully formatted Markdown. "
+            "Never output raw JSON, Python dictionaries, database records, or plain text dumps.\n\n"
 
-    "Formatting Rules:\n"
-    "1. Begin with a short introductory summary (1-3 sentences) that directly answers the user's question.\n"
-    "2. Organize the response using Markdown headings (##, ###, or ####).\n"
-    "3. Use bullet points or numbered lists whenever appropriate.\n"
-    "4. Highlight important information such as names, dates, roles, locations, technologies, and keywords using bold text.\n"
-    "5. Whenever presenting structured information (events, members, projects, schedules, repositories, achievements, etc.), use Markdown tables.\n"
-    "6. If URLs are available in the context, display them as Markdown links: [text](url).\n"
-    "7. If image URLs are available, include them using Markdown image syntax: ![description](image_url).\n"
-    "8. If the answer naturally contains multiple categories (e.g., Upcoming Events and Past Events), create a separate section for each.\n"
-    "9. Remove duplicate entries before presenting the response.\n"
-    "10. If a field such as time, venue, or link is missing, display '—' instead of leaving it blank.\n"
-    "11. Keep the response visually clean with proper spacing between sections, lists, and tables.\n"
-    "12. End with a short concluding sentence only if it adds value.\n\n"
+            "Formatting Rules:\n"
+            "1. Begin with a short introductory summary (1-3 sentences) that directly answers the user's question.\n"
+            "2. Organize the response using Markdown headings (##, ###, or ####).\n"
+            "3. Use bullet points or numbered lists whenever appropriate.\n"
+            "4. Highlight important information such as names, dates, roles, locations, technologies, and keywords using bold text.\n"
+            "5. Whenever presenting structured information (events, members, projects, schedules, repositories, achievements, etc.), use Markdown tables.\n"
+            "6. If URLs are available in the context, display them as Markdown links: [text](url).\n"
+            "7. If image URLs are available, include them using Markdown image syntax: ![description](image_url).\n"
+            "8. If the answer naturally contains multiple categories (e.g., Upcoming Events and Past Events), create a separate section for each.\n"
+            "9. Remove duplicate entries before presenting the response.\n"
+            "10. If a field such as time, venue, or link is missing, display '—' instead of leaving it blank.\n"
+            "11. Keep the response visually clean with proper spacing between sections, lists, and tables.\n"
+            "12. End with a short concluding sentence only if it adds value.\n\n"
 
-    "Additional Instructions:\n"
-    "- Do not include implementation details, IDs, metadata, embeddings, filenames, or internal database information.\n"
-    "- Do not mention that the answer was generated from context or retrieved documents.\n"
-    "- If multiple context sources contain the same information, merge them into a single coherent answer.\n"
-    "- If the context contains conflicting information, prefer the most complete and recent entry.\n"
-    "- STRICT OUT-OF-SCOPE RULE: If the user's question is about anything unrelated to GLUG "
-    "(e.g., general coding help, math, jokes, other colleges, celebrities, world news, etc.), "
-    "you MUST reply with EXACTLY the following message and nothing else:\n"
-    f"  {FALLBACK_MESSAGE}\n"
-    "- Do NOT attempt to answer out-of-scope questions even partially. Do NOT apologize or explain.\n"
-    "- If the requested GLUG-related information is not present in the provided context, reply with EXACTLY:\n"
-    f"  {FALLBACK_MESSAGE}"
-)
+            "Additional Instructions:\n"
+            "- Do not include implementation details, IDs, metadata, embeddings, filenames, or internal database information.\n"
+            "- Do not mention that the answer was generated from context or retrieved documents.\n"
+            "- If multiple context sources contain the same information, merge them into a single coherent answer.\n"
+            "- If the context contains conflicting information, prefer the most complete and recent entry.\n"
+            "- STRICT OUT-OF-SCOPE RULE: If the user's question is about anything unrelated to GLUG "
+            "(e.g., general coding help, math, jokes, other colleges, celebrities, world news, etc.), "
+            "you MUST reply with EXACTLY the following message and nothing else:\n"
+            f"  {FALLBACK_MESSAGE}\n"
+            "- Do NOT attempt to answer out-of-scope questions even partially. Do NOT apologize or explain.\n"
+            "- If the requested GLUG-related information is not present in the provided context, reply with EXACTLY:\n"
+            f"  {FALLBACK_MESSAGE}"
+        )
         messages = [
             SystemMessage(content=system_instruction),
             HumanMessage(
@@ -374,16 +394,14 @@ class LLMService:
         ]
 
         try:
-            # Stream the response chunks in the background
             full_response = ""
             async for chunk in self.llm.astream(messages):
                 if chunk.content:
                     full_response += chunk.content
                     yield f"data: {json.dumps({'response': chunk.content})}\n\n"
             
-            # --- Save to LLM Response Cache ---
+            # --- Save to Redis Cache ---
             try:
-                redis_client = await self._get_redis_client()
                 if redis_client:
                     await redis_client.setex(cache_key, 86400, full_response)
             except Exception as e:
@@ -396,12 +414,9 @@ class LLMService:
             yield "data: [DONE]\n\n"
 
     async def refresh_cache(self):
-        # Redis clear cache is now manual if needed since we cache LLM responses instead of the whole DB
         redis_client = await self._get_redis_client()
         if redis_client:
             await redis_client.flushdb()
-
-
 
 llm_service = LLMService()
 
