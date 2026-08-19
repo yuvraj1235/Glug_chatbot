@@ -22,3 +22,6 @@ langchain-groq>=0.2.0
 
 # --- Local Reranking ---
 flashrank>=0.2.8
+
+langchain-aws
+boto3
