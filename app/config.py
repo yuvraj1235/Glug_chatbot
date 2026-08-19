@@ -18,8 +18,8 @@ class Settings(BaseSettings):
     # 2. AWS Bedrock Configuration
     AWS_ACCESS_KEY_ID: str | None = None
     AWS_SECRET_ACCESS_KEY: str | None = None
-    AWS_REGION_NAME: str = "ap-south-1"  # Updated to Mumbai
-    DEFAULT_MODEL: str = "openai.gpt-oss-20b-1:0"  # Updated to the correct Bedrock format
+    AWS_REGION_NAME: str = "us-east-1"  # Strongly recommended for Amazon Nova models
+    DEFAULT_MODEL: str = "amazon.nova-micro-v1:0" # Switched to Nova Micro
 
     # 3. Cloud tokens & optional services
     HUGGINGFACEHUB_API_TOKEN: str | None = None

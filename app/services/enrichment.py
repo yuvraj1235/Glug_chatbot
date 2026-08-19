@@ -27,10 +27,7 @@ def save_cache(cache: dict):
     except Exception as e:
         logger.error(f"[Enrichment Cache] Failed to save cache: {e}")
 
-async def enrich_with_hf_summary(
-    source: str,
-    raw_text: str
-) -> str:
+async def enrich_with_hf_summary(source: str, raw_text: str) -> str:
     """
     Transforms raw API dumps into clean, uniform natural language paragraphs (prose)
     using AWS Bedrock to eliminate technical syntax boilerplate.
@@ -89,9 +86,16 @@ async def enrich_with_hf_summary(
         ]
 
         response = await llm.ainvoke(messages)
-        result_text = response.content.strip()
+        
+        # Safely extract text from the Bedrock response
+        result_text = ""
+        if isinstance(response.content, list):
+            result_text = "".join(block.get("text", "") if isinstance(block, dict) else str(block) for block in response.content)
+        else:
+            result_text = str(response.content)
+            
+        result_text = result_text.strip()
 
-        # Strip markdown block formatting if the model returns it
         if result_text.startswith("```json"):
             result_text = result_text[7:-3].strip()
         elif result_text.startswith("```"):
