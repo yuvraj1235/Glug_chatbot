@@ -8,11 +8,10 @@ import redis.asyncio as redis
 from supabase.client import Client, create_client
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEndpointEmbeddings
-from langchain_groq import ChatGroq
+from langchain_aws import ChatBedrockConverse
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_community.vectorstores import SupabaseVectorStore
 from app.config import settings
-from app.services.reranker import HFServerlessReranker, CohereReranker
 
 logger = logging.getLogger("chatbot")
 
@@ -25,16 +24,12 @@ FALLBACK_MESSAGE = (
 )
 
 class LLMService:
-    MAX_PROMPT_LENGTH = 200  # Must match the frontend character limit
+    MAX_PROMPT_LENGTH = 200
 
     def __init__(self):
-        # --- In-Memory Cooldown Tracker (Independent of Redis) ---
         self._cooldowns: dict[str, float] = {}
-
-        # --- Redis Cache ---
         self.redis_client = None
 
-        # --- DB + Retriever ---
         try:
             self.embeddings = HuggingFaceEndpointEmbeddings(
                 model="BAAI/bge-base-en-v1.5",
@@ -44,41 +39,30 @@ class LLMService:
                 settings.SUPABASE_URL,
                 settings.SUPABASE_SERVICE_KEY
             )
-            
-            # Use Native Supabase Vector Store
             self.db = SupabaseVectorStore(
                 embedding=self.embeddings,
                 client=self.supabase_client,
                 table_name="documents",
                 query_name="match_documents"
             )
+            self.base_retriever = self.db.as_retriever(search_kwargs={"k": 20})
 
-            # Plain base retriever
-            self.base_retriever = self.db.as_retriever(
-                search_kwargs={"k": 20}
-            )
-
-            # Reranker
             if settings.USE_RERANKER:
+                from app.services.reranker import HFServerlessReranker, CohereReranker
                 if settings.COHERE_API_KEY:
-                    logger.info("Initializing CohereReranker...")
                     self.compressor = CohereReranker(
                         api_token=settings.COHERE_API_KEY,
                         model_name="rerank-v3.5",
                         top_n=80
                     )
                 else:
-                    logger.info("Initializing HFServerlessReranker...")
                     self.compressor = HFServerlessReranker(
                         api_token=settings.HUGGINGFACEHUB_API_TOKEN,
                         model_name="BAAI/bge-reranker-base",
                         top_n=80
                     )
-                logger.info("DB, Retriever and Reranker initialized successfully")
             else:
-                logger.info("Reranker is disabled by configuration.")
                 self.compressor = None
-                logger.info("DB and Retriever initialized successfully")
 
         except Exception as e:
             logger.error(f"Error connecting to DB/Retriever: {e}")
@@ -86,25 +70,23 @@ class LLMService:
             self.base_retriever = None
             self.compressor = None
 
-        # --- LLM ---
         try:
-            model_name = settings.DEFAULT_MODEL
-            if "gemini" in model_name.lower():
-                model_name = "openai/gpt-oss-20b"
-                logger.warning(f"Gemini model detected. Swapping to: {model_name}")
-
-            self.llm = ChatGroq(
-                api_key=settings.GROQ_API_KEY,
-                model=model_name,
+            # Initialize configured LLM via AWS Bedrock
+            self.llm = ChatBedrockConverse(
+                model=settings.DEFAULT_MODEL,
                 temperature=0.3,
-                max_tokens=1500
+                max_tokens=1500,
+                region_name=settings.AWS_REGION_NAME,
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
             )
-            logger.info(f"LLM initialized: {model_name}")
+            logger.info(f"LLM initialized: {settings.DEFAULT_MODEL} (AWS Bedrock)")
 
         except Exception as e:
             logger.error(f"Error configuring LLM: {e}")
             self.llm = None
 
+    # ... [Keep the rest of your methods (_get_redis_client, _get_search_filter, _get_year_exact_matches, generate_response, refresh_cache) exactly as they are] ...
     async def _get_redis_client(self):
         if not hasattr(self, 'redis_client') or self.redis_client is None:
             try:
@@ -396,9 +378,19 @@ class LLMService:
         try:
             full_response = ""
             async for chunk in self.llm.astream(messages):
-                if chunk.content:
-                    full_response += chunk.content
-                    yield f"data: {json.dumps({'response': chunk.content})}\n\n"
+                # Extract text safely whether Bedrock returns a string or a list of blocks
+                chunk_data = chunk.content
+                if isinstance(chunk_data, list):
+                    text_chunk = "".join(
+                        block.get("text", "") if isinstance(block, dict) else str(block)
+                        for block in chunk_data
+                    )
+                else:
+                    text_chunk = str(chunk_data)
+
+                if text_chunk:
+                    full_response += text_chunk
+                    yield f"data: {json.dumps({'response': text_chunk})}\n\n"
             
             # --- Save to Redis Cache ---
             try:

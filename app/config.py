@@ -1,7 +1,6 @@
 import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Dynamically find the absolute path to the chatbot-backend/.env file
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ENV_PATH = os.path.join(BASE_DIR, "../.env")
 
@@ -12,13 +11,15 @@ class Settings(BaseSettings):
         extra="ignore"
     )
 
-    # 1. Enforce Supabase configurations strictly as required fields
+    # 1. Supabase Configurations
     SUPABASE_URL: str
     SUPABASE_SERVICE_KEY: str
 
-    # 2. Enforce Groq configuration for fast, free cloud text generation
-    GROQ_API_KEY: str | None = None
-    DEFAULT_MODEL: str = "openai/gpt-oss-20b"
+    # 2. AWS Bedrock Configuration
+    AWS_ACCESS_KEY_ID: str | None = None
+    AWS_SECRET_ACCESS_KEY: str | None = None
+    AWS_REGION_NAME: str = "ap-south-1"  # Updated to Mumbai
+    DEFAULT_MODEL: str = "openai.gpt-oss-20b-1:0"  # Updated to the correct Bedrock format
 
     # 3. Cloud tokens & optional services
     HUGGINGFACEHUB_API_TOKEN: str | None = None
@@ -27,7 +28,7 @@ class Settings(BaseSettings):
     COHERE_API_KEY: str | None = None
     USE_RERANKER: bool = True
     
-    # 4. Redis configuration (for response caching)
+    # 4. Redis configuration
     REDIS_URL: str = "redis://localhost:6379/0"
 
     # 5. In-Memory Cooldown Duration
